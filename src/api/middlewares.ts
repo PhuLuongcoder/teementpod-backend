@@ -1,31 +1,29 @@
 import { defineMiddlewares } from "@medusajs/framework/http";
 import cors from "cors";
 
-// Hàm xử lý: Biến chuỗi cách nhau bằng dấu phẩy trong .env thành mảng (Array) cho thư viện CORS hiểu
+// Hàm biến chuỗi trong .env thành mảng (Array) chuẩn
 const parseCorsOrigins = (envVar: string | undefined, fallback: string) => {
-  if (!envVar) return fallback;
+  if (!envVar) return [fallback]; // Đảm bảo luôn trả về mảng
   return envVar.split(",").map(url => url.trim());
 };
 
 export default defineMiddlewares({
   routes: [
     {
-      // 1. Áp dụng CORS cho cổng Seller Dashboard
       matcher: "/partner/*",
+      method: "ALL", // BẮT BUỘC: Đảm bảo xử lý cả request thăm dò (OPTIONS)
       middlewares: [
         cors({
-          // Đọc từ biến STORE_CORS (đã chứa link seller.teementpod.us)
           origin: parseCorsOrigins(process.env.STORE_CORS, "http://localhost:3001"), 
-          credentials: true, // Đồng ý nhận Cookie/Phiên đăng nhập
+          credentials: true, 
         }),
       ],
     },
     {
-      // 2. Áp dụng CORS cho cổng Admin Dashboard
       matcher: "/admin/*",
+      method: "ALL", // BẮT BUỘC
       middlewares: [
         cors({
-          // Đọc từ biến ADMIN_CORS
           origin: parseCorsOrigins(process.env.ADMIN_CORS, "http://localhost:3000"),
           credentials: true,
         }),
