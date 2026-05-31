@@ -11,7 +11,7 @@ export default defineMiddlewares({
   routes: [
     {
       matcher: "/partner/*",
-      method: "ALL", // BẮT BUỘC: Đảm bảo xử lý cả request thăm dò (OPTIONS)
+      method: "USE", // BẮT BUỘC: Đảm bảo xử lý cả request thăm dò (OPTIONS)
       middlewares: [
         cors({
           origin: parseCorsOrigins(process.env.STORE_CORS, "http://localhost:3001"), 
@@ -21,7 +21,7 @@ export default defineMiddlewares({
     },
     {
       matcher: "/admin/*",
-      method: "ALL", // BẮT BUỘC
+      method: "USE", // BẮT BUỘC
       middlewares: [
         cors({
           origin: parseCorsOrigins(process.env.ADMIN_CORS, "http://localhost:3000"),
