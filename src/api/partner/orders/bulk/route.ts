@@ -1,7 +1,7 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http";
 
 export async function POST(req: MedusaRequest, res: MedusaResponse) {
-  const sellerService = req.scope.resolve("sellerModuleService");
+  const sellerService = req.scope.resolve("sellerModuleService") as any;
   
   const { ids, action } = req.body as { ids: string[], action: 'cancel' | 'archive' };
 

@@ -9,7 +9,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     }
 
     // 1. Gọi Service quản lý Database của Seller
-    const sellerService = req.scope.resolve("sellerModuleService")
+    const sellerService = req.scope.resolve("sellerModuleService") as any;
 
     // 2. Tìm trong Database xem có ai dùng email này chưa
     const sellers = await sellerService.listSellers({ email: body.email })

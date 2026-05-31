@@ -2,7 +2,7 @@ import type { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 
 export async function GET(req: MedusaRequest, res: MedusaResponse) {
   try {
-    const sellerService = req.scope.resolve("sellerModuleService");
+    const sellerService = req.scope.resolve("sellerModuleService") as any;
     
     const shop_id = req.query.shop_id as string;
     const search = req.query.search as string;
