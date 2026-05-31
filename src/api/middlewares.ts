@@ -1,21 +1,37 @@
-import { loadEnv, defineConfig } from "@medusajs/framework/utils"
+import { defineMiddlewares } from "@medusajs/framework/http";
+import cors from "cors";
 
-loadEnv(process.env.NODE_ENV || "development", process.cwd())
-
-module.exports = defineConfig({
-  projectConfig: {
-    databaseUrl: process.env.DATABASE_URL,
-    http: {
-      // CẤU HÌNH TỔNG: Cho phép tất cả các nguồn truy cập
-      storeCors: "*", 
-      adminCors: "*",
-      authCors: "*",
-      jwtSecret: process.env.JWT_SECRET || "supersecret",
-      cookieSecret: process.env.COOKIE_SECRET || "supersecret",
+export default defineMiddlewares({
+  routes: [
+    {
+      // 1. Dành cho cổng Seller
+      matcher: "/partner/*",
+      // Bỏ luôn chữ method để nó tự động bắt mọi request, bao gồm cả OPTIONS
+      middlewares: [
+        cors({
+          origin: [
+            "https://seller.teementpod.us",
+            "https://teementpod.us",
+            "https://www.teementpod.us",
+            "http://localhost:3001"
+          ], 
+          credentials: true, 
+        }),
+      ],
+    },
+    {
+      // 2. Dành cho cổng Admin
+      matcher: "/admin/*",
+      middlewares: [
+        cors({
+          origin: [
+            "https://api.teementpod.us",
+            "https://seller.teementpod.us",
+            "http://localhost:3000"
+          ],
+          credentials: true,
+        }),
+      ],
     }
-  },
-  admin: {
-    backendUrl: "https://api.teementpod.us",
-  },
-  // ... phần còn lại giữ nguyên
-})
+  ],
+});
