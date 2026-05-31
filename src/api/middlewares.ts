@@ -1,30 +1,34 @@
 import { defineMiddlewares } from "@medusajs/framework/http";
 import cors from "cors";
 
-// Hàm biến chuỗi trong .env thành mảng (Array) chuẩn
-const parseCorsOrigins = (envVar: string | undefined, fallback: string) => {
-  if (!envVar) return [fallback]; // Đảm bảo luôn trả về mảng
-  return envVar.split(",").map(url => url.trim());
-};
-
 export default defineMiddlewares({
   routes: [
     {
+      // 1. Dành cho cổng Seller
       matcher: "/partner/*",
-      method: "USE", // BẮT BUỘC: Đảm bảo xử lý cả request thăm dò (OPTIONS)
+      // Bỏ luôn chữ method để nó tự động bắt mọi request, bao gồm cả OPTIONS
       middlewares: [
         cors({
-          origin: parseCorsOrigins(process.env.STORE_CORS, "http://localhost:3001"), 
+          origin: [
+            "https://seller.teementpod.us",
+            "https://teementpod.us",
+            "https://www.teementpod.us",
+            "http://localhost:3001"
+          ], 
           credentials: true, 
         }),
       ],
     },
     {
+      // 2. Dành cho cổng Admin
       matcher: "/admin/*",
-      method: "USE", // BẮT BUỘC
       middlewares: [
         cors({
-          origin: parseCorsOrigins(process.env.ADMIN_CORS, "http://localhost:3000"),
+          origin: [
+            "https://api.teementpod.us",
+            "https://seller.teementpod.us",
+            "http://localhost:3000"
+          ],
           credentials: true,
         }),
       ],
