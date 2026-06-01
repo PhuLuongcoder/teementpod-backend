@@ -57,7 +57,7 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
 }
 export async function POST(req: MedusaRequest, res: MedusaResponse) {
   try {
-    const sellerService = req.scope.resolve("sellerModuleService") as any;
+    const sellerService = req.scope.resolve("sellerModuleService")
     
     // 1. NHẬN DỮ LIỆU TỪ FRONTEND
     const body = req.body as { orders: any[], target_shop_id: string }
@@ -122,22 +122,23 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
       if (!order.items || order.items.length === 0) continue;
 
       for (const item of order.items) {
-        // Chuyển dữ liệu CSV về chữ thường (lowercase) để so sánh
-        const safeType = item.type ? item.type.trim().toLowerCase() : "";
-        const safeSku = item.sku ? item.sku.trim().toLowerCase() : "";
+        // THAY ĐỔI 1: Bổ sung replace để quét sạch mọi khoảng trắng kép và ký tự ẩn
+        const safeType = item.type ? item.type.replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/\s+/g, ' ').trim().toLowerCase() : "";
+        const safeSku = item.sku ? item.sku.replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/\s+/g, ' ').trim().toLowerCase() : "";
         
-        // TÌM KIẾM LINH HOẠT: Ưu tiên khớp SKU trước, nếu không có SKU thì khớp Tên phôi (bất chấp hoa thường)
+        // THAY ĐỔI 2: Đổi toàn bộ b.name thành b.product_type
         const matchedBlank = allBlanks.find(b => 
           (safeSku && b.sku?.toLowerCase() === safeSku) || 
-          (safeType && b.name?.toLowerCase() === safeType)
+          (safeType && b.product_type?.toLowerCase() === safeType)
         );
 
         if (matchedBlank) {
-          item.type = matchedBlank.name;
+          // THAY ĐỔI 3: Gán lại đúng tên trường
+          item.type = matchedBlank.product_type;
 
           // Kiểm tra hết hàng toàn bộ phôi
           if (matchedBlank.in_stock === false) {
-            outOfStockErrors.push(`Đơn [${order.external_order_id}]: Phôi "${matchedBlank.name}" hiện đang HẾT HÀNG toàn bộ.`);
+            outOfStockErrors.push(`Đơn [${order.external_order_id}]: Phôi "${matchedBlank.product_type}" hiện đang HẾT HÀNG toàn bộ.`);
           } 
           // Kiểm tra hết hàng theo từng phân loại (Color x Size)
           else if (matchedBlank.out_of_stock_variants && Array.isArray(matchedBlank.out_of_stock_variants)) {
@@ -147,7 +148,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
             );
             
             if (isVariantOos) {
-              outOfStockErrors.push(`Đơn [${order.external_order_id}]: Phôi "${matchedBlank.name}" (Màu: ${item.color}, Size: ${item.size}) hiện đang HẾT HÀNG.`);
+              outOfStockErrors.push(`Đơn [${order.external_order_id}]: Phôi "${matchedBlank.product_type}" (Màu: ${item.color}, Size: ${item.size}) hiện đang HẾT HÀNG.`);
             }
           }
         } else {
