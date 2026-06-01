@@ -4,12 +4,38 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
   try {
     const sellerService = req.scope.resolve("sellerModuleService") as any;
     
+    // --- 1. KHỐI BẢO MẬT: XÁC THỰC NGƯỜI DÙNG TỪ TOKEN ---
+    // (Lưu ý: Bạn hãy điều chỉnh 'req.user?.id' thành biến chứa ID user theo đúng Middleware Auth bạn đang dùng. Trong Medusa V2 thường là req.auth_context?.actor_id)
+    const currentSellerId = (req as any).user?.seller_id || (req as any).user?.id || (req as any).auth_context?.actor_id; 
+
+    if (!currentSellerId) {
+      return res.status(401).json({ error: "Truy cập bị từ chối: Vui lòng đăng nhập lại!" });
+    }
+    // -----------------------------------------------------
+
     const shop_id = req.query.shop_id as string;
+    
+    if (!shop_id) {
+       return res.status(400).json({ error: "Thiếu thông tin Cửa hàng (shop_id)." });
+    }
+
+    // --- 2. KHỐI BẢO MẬT: KIỂM TRA QUYỀN SỞ HỮU SHOP ---
+    const currentShopInfo = await sellerService.listShops({ id: shop_id });
+    
+    if (currentShopInfo.length === 0) {
+      return res.status(404).json({ error: "Không tìm thấy cửa hàng này!" });
+    }
+
+    if (currentShopInfo[0].seller_id !== currentSellerId) {
+      return res.status(403).json({ 
+        error: "Forbidden: Rò rỉ dữ liệu bị chặn! Bạn không có quyền xem đơn hàng của shop này." 
+      });
+    }
+    // -----------------------------------------------------
+
     const search = req.query.search as string;
     const startDate = req.query.startDate as string;
     const endDate = req.query.endDate as string;
-    
-    // 1. HỨNG THÊM THAM SỐ STATUS TỪ FRONTEND
     const status = req.query.status as string; 
     
     const page = parseInt(req.query.page as string) || 1;
@@ -18,7 +44,6 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
 
     let filters: any = { shop_id: shop_id };
     
-    // 2. NHÉT ĐIỀU KIỆN LỌC STATUS VÀO ĐÂY (bỏ qua nếu là 'all')
     if (status && status !== 'all') {
       filters.status = status;
     }
@@ -55,15 +80,22 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
     res.status(500).json({ error: error.message });
   }
 }
+
 export async function POST(req: MedusaRequest, res: MedusaResponse) {
   try {
     const sellerService = req.scope.resolve("sellerModuleService")
     
-    // 1. NHẬN DỮ LIỆU TỪ FRONTEND
+    // --- 1. KHỐI BẢO MẬT: XÁC THỰC NGƯỜI DÙNG ---
+    const currentSellerId = (req as any).user?.seller_id || (req as any).user?.id || (req as any).auth_context?.actor_id; 
+
+    if (!currentSellerId) {
+      return res.status(401).json({ error: "Truy cập bị từ chối: Vui lòng đăng nhập lại!" });
+    }
+    // -------------------------------------------
+
     const body = req.body as { orders: any[], target_shop_id: string }
     const { orders: rawOrders, target_shop_id } = body;
 
-    // 2. KIỂM TRA BẢO MẬT & DỮ LIỆU
     if (!target_shop_id) {
       return res.status(400).json({ error: "Vui lòng chọn Cửa hàng (Shop) trước khi import!" })
     }
@@ -71,6 +103,37 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     if (!rawOrders || rawOrders.length === 0) {
       return res.status(400).json({ error: "Không có dữ liệu đơn hàng nào được gửi lên." })
     }
+
+    // --- 2. KHỐI BẢO MẬT: KIỂM TRA QUYỀN SỞ HỮU SHOP TRƯỚC KHI IMPORT ---
+    let markupFee = 0;
+    const currentShopInfo = await sellerService.listShops(
+      { id: target_shop_id }, 
+      { relations: ["seller"] }
+    );
+
+    if (currentShopInfo.length === 0) {
+      return res.status(400).json({ error: "Cửa hàng không tồn tại trên hệ thống!" });
+    }
+
+    const targetShop = currentShopInfo[0];
+
+    // CHỐT CHẶN RÒ RỈ DỮ LIỆU CHÉO (CROSS-TENANT LEAKAGE)
+    if (targetShop.seller_id !== currentSellerId) {
+       return res.status(403).json({ 
+         error: "Forbidden: Bạn đang cố import đơn hàng vào Cửa hàng của người khác! Hành động đã bị chặn." 
+       });
+    }
+
+    if (targetShop.is_active === false) {
+      return res.status(403).json({ 
+        error: `Cửa hàng "${targetShop.name}" hiện đang bị khóa. Không thể tạo thêm đơn hàng mới! Vui lòng liên hệ Admin.` 
+      });
+    }
+
+    if (targetShop.seller) {
+      markupFee = targetShop.seller.markup_fee || 0;
+    }
+    // -------------------------------------------------------------------
 
     // 3. SƠ CHẾ VÀ GÁN ĐÚNG SHOP_ID MÀ SELLER ĐÃ CHỌN
     const formattedOrders: any[] = rawOrders.map((order: any) => {
@@ -115,32 +178,26 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     const outOfStockErrors: string[] = [];
     const unknownProductErrors: string[] = [];
 
-    // TỐI ƯU HIỆU SUẤT: Tải toàn bộ kho phôi 1 lần duy nhất thay vì query DB liên tục trong vòng lặp
     const allBlanks = await sellerService.listPodBlanks({}) as any[];
 
     for (const order of formattedOrders) {
       if (!order.items || order.items.length === 0) continue;
 
       for (const item of order.items) {
-        // Dọn dẹp khoảng trắng kép và ký tự ẩn từ file CSV
-        const safeType = item.type ? item.type.replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/\s+/g, ' ').trim().toLowerCase() : "";
-        const safeSku = item.sku ? item.sku.replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/\s+/g, ' ').trim().toLowerCase() : "";
+        const safeType = item.type ? item.type.trim().toLowerCase() : "";
+        const safeSku = item.sku ? item.sku.trim().toLowerCase() : "";
         
-        // LUỒNG CŨ: Tìm kiếm dựa trên cột 'name' của bảng pod_blank
-        const matchedBlank = allBlanks.find(b => 
+        const matchedBlank = allBlanks.find((b: any) => 
           (safeSku && b.sku?.toLowerCase() === safeSku) || 
           (safeType && b.name?.toLowerCase() === safeType)
         );
 
         if (matchedBlank) {
-          // QUAN TRỌNG: Gán lại đúng tên phôi chuẩn từ pod_blank để mang xuống bước tính giá
           item.type = matchedBlank.name;
 
-          // Kiểm tra hết hàng toàn bộ phôi
           if (matchedBlank.in_stock === false) {
             outOfStockErrors.push(`Đơn [${order.external_order_id}]: Phôi "${matchedBlank.name}" hiện đang HẾT HÀNG toàn bộ.`);
           } 
-          // Kiểm tra hết hàng theo từng phân loại (Color x Size)
           else if (matchedBlank.out_of_stock_variants && Array.isArray(matchedBlank.out_of_stock_variants)) {
             const isVariantOos = matchedBlank.out_of_stock_variants.some(
               (v: any) => v.color?.toLowerCase() === item.color?.trim().toLowerCase() && 
@@ -157,10 +214,8 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
       }
     }
 
-    // Nếu mảng lưu lỗi có chứa phần tử -> Tức là phát hiện vi phạm -> Chặn Import ngay lập tức
     if (outOfStockErrors.length > 0 || unknownProductErrors.length > 0) {
       const allErrors = [...outOfStockErrors, ...unknownProductErrors];
-      // Cắt ngắn nếu lỗi quá dài (tránh vỡ giao diện popup)
       const displayErrors = allErrors.slice(0, 10).map(err => `• ${err}`).join('\n');
       const moreText = allErrors.length > 10 ? `\n\n... và ${allErrors.length - 10} lỗi khác.` : '';
 
@@ -168,7 +223,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
         error: `Tải file thất bại! Phát hiện sản phẩm không hợp lệ:\n\n${displayErrors}${moreText}\n\n-> Vui lòng sửa lại file CSV hoặc báo Admin thêm phôi.` 
       });
     }
-    // --- KHÔI PHỤC LOGIC XỬ LÝ DESIGN LIBRARY ---
+
     for (const orderData of formattedOrders) {
       if (!orderData.items || orderData.items.length === 0) continue;
 
@@ -208,35 +263,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
         }
       }
     }
-    // --- KẾT THÚC LOGIC DESIGN LIBRARY ---
 
-    // TRUY VẤN THÔNG TIN SHOP VÀ MARKUP FEE
-    let markupFee = 0;
-    const currentShopInfo = await sellerService.listShops(
-      { id: target_shop_id }, 
-      { relations: ["seller"] }
-    );
-
-    // 1. Kiểm tra shop có tồn tại không
-    if (currentShopInfo.length === 0) {
-      return res.status(400).json({ error: "Cửa hàng không tồn tại trên hệ thống!" });
-    }
-
-    const targetShop = currentShopInfo[0];
-
-    // 2. CHẶN ĐỨNG NẾU SHOP ĐÃ BỊ KHÓA
-    if (targetShop.is_active === false) {
-      return res.status(403).json({ 
-        error: `Cửa hàng "${targetShop.name}" hiện đang bị khóa. Không thể tạo thêm đơn hàng mới! Vui lòng liên hệ Admin.` 
-      });
-    }
-
-    // 3. Lấy phí Markup nếu hợp lệ
-    if (targetShop.seller) {
-      markupFee = targetShop.seller.markup_fee || 0;
-    }
-
-    // --- BẮT ĐẦU KHỐI LOGIC TÍNH GIÁ (ĐÃ FIX LỖI TÌM THEO PRODUCT_TYPE & UNDEFINED) ---
     for (const orderData of formattedOrders) {
       if (!orderData.items || orderData.items.length === 0) continue;
 
@@ -260,7 +287,6 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
       const shipCfg = shipConfigs.length > 0 ? shipConfigs[0] : { first_item_cost: 0, additional_item_cost: 0 };
 
       for (const item of orderData.items) {
-        // BẢO VỆ CHỐNG LỖI KHI DỮ LIỆU CSV BỊ TRỐNG
         const safeType = item.type ? item.type.trim() : "";
         const safeSize = item.size ? item.size.trim() : "";
 
@@ -291,18 +317,14 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
       orderData.shipping_cost = totalShippingCost;
       orderData.order_price = totalCalculatedPrice + totalShippingCost; 
     }
-    // --- KẾT THÚC KHỐI LOGIC TÍNH GIÁ ---
 
-    // 4. LƯU VÀO DATABASE BẰNG CƠ CHẾ UPSERT
     const extractedIds = formattedOrders.map((o: any) => o.external_order_id);
     
-    // Truy vấn 1 lần duy nhất để lấy toàn bộ danh sách ID đã tồn tại trong DB của Shop này
     const existingOrders = await sellerService.listSellerOrders({
       external_order_id: extractedIds,
       shop_id: target_shop_id
     });
     
-    // Đưa vào Set để tra cứu tốc độ cao (O(1))
     const existingIdSet = new Set(existingOrders.map((o: any) => o.external_order_id));
     
     let createdCount = 0;
@@ -310,21 +332,17 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
 
     for (const orderData of formattedOrders) {
       if (existingIdSet.has(orderData.external_order_id)) {
-        // Đã tồn tại -> Bỏ qua dòng này và đưa ID vào danh sách thông báo
         skippedOrderIds.push(orderData.external_order_id);
         continue;
       }
       
-      // Chưa tồn tại -> Tiến hành tạo mới
       await sellerService.createSellerOrders(orderData);
       createdCount++;
     }
 
-    // Xử lý định dạng chuỗi thông báo kết quả trả về cho Seller
     let responseMessage = `Đã đồng bộ thành công ${createdCount} đơn hàng mới!`;
     
     if (skippedOrderIds.length > 0) {
-      // Giới hạn hiển thị 5 ID đầu tiên để tránh làm vỡ giao diện UI nếu trùng quá nhiều
       const displayIds = skippedOrderIds.slice(0, 5).join(', ');
       const moreText = skippedOrderIds.length > 5 ? `... và ${skippedOrderIds.length - 5} mã khác` : '';
       responseMessage += `\n Bỏ qua ${skippedOrderIds.length} đơn bị trùng ID: ${displayIds} ${moreText}`;
