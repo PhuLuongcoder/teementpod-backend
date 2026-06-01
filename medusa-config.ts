@@ -17,5 +17,12 @@ module.exports = defineConfig({
   admin: {
     backendUrl: "https://api.teementpod.us",
   },
-  // ... phần còn lại giữ nguyên
+  // BẮT ĐẦU THÊM ĐOẠN NÀY ĐỂ ĐĂNG KÝ MODULE SHOP
+  modules: {
+    shop: {
+      resolve: "./src/modules/shop", // Đảm bảo đường dẫn này trỏ đúng tới thư mục code module của bạn
+    },
+  },
+  // KẾT THÚC PHẦN THÊM MỚI
+  // ... phần còn lại giữ nguyên (nếu có)
 })
