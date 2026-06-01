@@ -1,14 +1,25 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http";
+import jwt from "jsonwebtoken";
 
 export async function GET(req: MedusaRequest, res: MedusaResponse) {
   try {
     const sellerService = req.scope.resolve("sellerModuleService") as any;
     
-    // --- 1. XÁC THỰC NGƯỜI DÙNG ---
-    const currentSellerId = (req as any).user?.seller_id || (req as any).user?.id || (req as any).auth_context?.actor_id; 
-    if (!currentSellerId) {
-      return res.status(401).json({ error: "Chưa đăng nhập!" });
+    // --- 1. KHỐI BẢO MẬT: TỰ GIẢI MÃ TOKEN ĐỂ LẤY SELLER_ID ---
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "Chưa đăng nhập hoặc thiếu Token!" });
     }
+
+    let currentSellerId = "";
+    try {
+      const token = authHeader.split(" ")[1];
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || "super-secret-key-teement") as any;
+      currentSellerId = decoded.seller_id;
+    } catch (err) {
+      return res.status(401).json({ error: "Token hết hạn hoặc không hợp lệ!" });
+    }
+    // -----------------------------------------------------------
     
     const shop_id = req.query.shop_id as string;
     const range = (req.query.range as string) || 'month';
@@ -17,17 +28,14 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
     
     // --- 2. XỬ LÝ LỌC THEO QUYỀN SỞ HỮU CỬA HÀNG (MULTI-TENANT FIX) ---
     if (shop_id) {
-      // Trường hợp xem 1 shop: Phải kiểm tra shop đó có thuộc về Seller này không
       const shopCheck = await sellerService.listShops({ id: shop_id, seller_id: currentSellerId });
       if (shopCheck.length === 0) {
         return res.status(403).json({ error: "Bạn không có quyền truy cập dữ liệu của cửa hàng này!" });
       }
       filters.shop_id = shop_id; 
     } else {
-      // Trường hợp xem "Tất cả": Chỉ lấy danh sách ID cửa hàng CỦA SELLER ĐÓ
       const myShops = await sellerService.listShops({ seller_id: currentSellerId });
       
-      // Nếu Seller mới toanh, chưa tạo shop nào -> Trả về 0 đồng luôn cho nhanh, không cần tính toán
       if (myShops.length === 0) {
         return res.json({
           stats: { total_revenue: 0, total_orders: 0, avg_order_value: 0, support_stats: { orders: 0, amount: 0 }, current_debt: 0, total_paid: 0 },
@@ -35,9 +43,8 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
         });
       }
       
-      // Lấy mảng ID và gán vào bộ lọc
       const myShopIds = myShops.map((s: any) => s.id);
-      filters.shop_id = myShopIds; // Medusa hỗ trợ truyền mảng [id1, id2] thay cho IN
+      filters.shop_id = myShopIds; 
     }
 
     // ==========================================
@@ -171,7 +178,6 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
     // ==========================================
     // 6. TÍNH TOÁN CÔNG NỢ & LỊCH SỬ THANH TOÁN
     // ==========================================
-    // Dùng lại bộ lọc đã có myShopIds
     const paymentHistory = await sellerService.listPaymentHistories(
       filters.shop_id ? { shop_id: filters.shop_id } : {}, 
       { order: { created_at: "DESC" } } 
