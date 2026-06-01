@@ -57,7 +57,7 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
 }
 export async function POST(req: MedusaRequest, res: MedusaResponse) {
   try {
-    const sellerService = req.scope.resolve("sellerModuleService")
+    const sellerService = req.scope.resolve("sellerModuleService") as any;
     
     // 1. NHẬN DỮ LIỆU TỪ FRONTEND
     const body = req.body as { orders: any[], target_shop_id: string }
