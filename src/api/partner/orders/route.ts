@@ -1,17 +1,25 @@
 import type { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
+import jwt from "jsonwebtoken";
 
 export async function GET(req: MedusaRequest, res: MedusaResponse) {
   try {
     const sellerService = req.scope.resolve("sellerModuleService") as any;
     
-    // --- 1. KHỐI BẢO MẬT: XÁC THỰC NGƯỜI DÙNG TỪ TOKEN ---
-    // (Lưu ý: Bạn hãy điều chỉnh 'req.user?.id' thành biến chứa ID user theo đúng Middleware Auth bạn đang dùng. Trong Medusa V2 thường là req.auth_context?.actor_id)
-    const currentSellerId = (req as any).user?.seller_id || (req as any).user?.id || (req as any).auth_context?.actor_id; 
-
-    if (!currentSellerId) {
+    // --- 1. KHỐI BẢO MẬT: TỰ GIẢI MÃ TOKEN ---
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return res.status(401).json({ error: "Truy cập bị từ chối: Vui lòng đăng nhập lại!" });
     }
-    // -----------------------------------------------------
+
+    let currentSellerId = "";
+    try {
+      const token = authHeader.split(" ")[1];
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || "super-secret-key-teement") as any;
+      currentSellerId = decoded.seller_id;
+    } catch (err) {
+      return res.status(401).json({ error: "Token hết hạn hoặc không hợp lệ!" });
+    }
+    // ------------------------------------------
 
     const shop_id = req.query.shop_id as string;
     
@@ -85,13 +93,21 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
   try {
     const sellerService = req.scope.resolve("sellerModuleService")
     
-    // --- 1. KHỐI BẢO MẬT: XÁC THỰC NGƯỜI DÙNG ---
-    const currentSellerId = (req as any).user?.seller_id || (req as any).user?.id || (req as any).auth_context?.actor_id; 
-
-    if (!currentSellerId) {
+    // --- 1. KHỐI BẢO MẬT: TỰ GIẢI MÃ TOKEN ---
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return res.status(401).json({ error: "Truy cập bị từ chối: Vui lòng đăng nhập lại!" });
     }
-    // -------------------------------------------
+
+    let currentSellerId = "";
+    try {
+      const token = authHeader.split(" ")[1];
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || "super-secret-key-teement") as any;
+      currentSellerId = decoded.seller_id;
+    } catch (err) {
+      return res.status(401).json({ error: "Token hết hạn hoặc không hợp lệ!" });
+    }
+    // ------------------------------------------
 
     const body = req.body as { orders: any[], target_shop_id: string }
     const { orders: rawOrders, target_shop_id } = body;
