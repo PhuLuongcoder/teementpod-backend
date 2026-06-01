@@ -19,7 +19,7 @@ module.exports = defineConfig({
   },
   // BẮT ĐẦU THÊM ĐOẠN NÀY ĐỂ ĐĂNG KÝ MODULE SHOP
   modules: {
-    shop: {
+    sellerModuleService: {
       resolve: "./src/modules/sellers", // Đảm bảo đường dẫn này trỏ đúng tới thư mục code module của bạn
     },
   },
