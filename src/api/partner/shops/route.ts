@@ -1,13 +1,23 @@
 import type { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
+import jwt from "jsonwebtoken";
 
 export async function GET(req: MedusaRequest, res: MedusaResponse) {
   try {
-    // 1. LẤY ID NGƯỜI DÙNG TỪ TOKEN (Xác thực)
-    const currentSellerId = (req as any).user?.seller_id || (req as any).user?.id || (req as any).auth_context?.actor_id; 
-
-    if (!currentSellerId) {
-      return res.status(401).json({ error: "Chưa đăng nhập hoặc phiên đã hết hạn!" });
+    // --- KHỐI BẢO MẬT MỚI (TỰ GIẢI MÃ TOKEN) ---
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "Chưa đăng nhập hoặc thiếu Token!" });
     }
+
+    let currentSellerId = "";
+    try {
+      const token = authHeader.split(" ")[1];
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || "super-secret-key-teement") as any;
+      currentSellerId = decoded.seller_id;
+    } catch (err) {
+      return res.status(401).json({ error: "Token hết hạn hoặc không hợp lệ!" });
+    }
+    // ------------------------------------------
 
     const query = req.scope.resolve("query");
     
@@ -42,14 +52,21 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
       return res.status(400).json({ error: "Tên cửa hàng không được để trống!" });
     }
 
-    // 1. LẤY ID NGƯỜI DÙNG TỪ TOKEN
-    const currentSellerId = (req as any).user?.seller_id || (req as any).user?.id || (req as any).auth_context?.actor_id; 
-
-    if (!currentSellerId) {
-      return res.status(401).json({ error: "Chưa đăng nhập! Không thể tạo cửa hàng." });
+    // --- KHỐI BẢO MẬT MỚI (TỰ GIẢI MÃ TOKEN) ---
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "Chưa đăng nhập hoặc thiếu Token!" });
     }
 
-    // (Đã xóa bỏ đoạn code lỗi tự động gán cho sellers[0] của bạn)
+    let currentSellerId = "";
+    try {
+      const token = authHeader.split(" ")[1];
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || "super-secret-key-teement") as any;
+      currentSellerId = decoded.seller_id;
+    } catch (err) {
+      return res.status(401).json({ error: "Token hết hạn hoặc không hợp lệ!" });
+    }
+    // ------------------------------------------
 
     // 2. TẠO CỬA HÀNG VÀ GẮN ĐÚNG VÀO SELLER ĐANG ĐĂNG NHẬP
     const newShops = await sellerService.createShops([
