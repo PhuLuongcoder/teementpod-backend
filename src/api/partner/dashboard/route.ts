@@ -4,16 +4,44 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
   try {
     const sellerService = req.scope.resolve("sellerModuleService") as any;
     
+    // --- 1. XÁC THỰC NGƯỜI DÙNG ---
+    const currentSellerId = (req as any).user?.seller_id || (req as any).user?.id || (req as any).auth_context?.actor_id; 
+    if (!currentSellerId) {
+      return res.status(401).json({ error: "Chưa đăng nhập!" });
+    }
+    
     const shop_id = req.query.shop_id as string;
     const range = (req.query.range as string) || 'month';
 
     const filters: any = {};
+    
+    // --- 2. XỬ LÝ LỌC THEO QUYỀN SỞ HỮU CỬA HÀNG (MULTI-TENANT FIX) ---
     if (shop_id) {
+      // Trường hợp xem 1 shop: Phải kiểm tra shop đó có thuộc về Seller này không
+      const shopCheck = await sellerService.listShops({ id: shop_id, seller_id: currentSellerId });
+      if (shopCheck.length === 0) {
+        return res.status(403).json({ error: "Bạn không có quyền truy cập dữ liệu của cửa hàng này!" });
+      }
       filters.shop_id = shop_id; 
+    } else {
+      // Trường hợp xem "Tất cả": Chỉ lấy danh sách ID cửa hàng CỦA SELLER ĐÓ
+      const myShops = await sellerService.listShops({ seller_id: currentSellerId });
+      
+      // Nếu Seller mới toanh, chưa tạo shop nào -> Trả về 0 đồng luôn cho nhanh, không cần tính toán
+      if (myShops.length === 0) {
+        return res.json({
+          stats: { total_revenue: 0, total_orders: 0, avg_order_value: 0, support_stats: { orders: 0, amount: 0 }, current_debt: 0, total_paid: 0 },
+          payment_history: [], charts: { revenue: [], status: [] }
+        });
+      }
+      
+      // Lấy mảng ID và gán vào bộ lọc
+      const myShopIds = myShops.map((s: any) => s.id);
+      filters.shop_id = myShopIds; // Medusa hỗ trợ truyền mảng [id1, id2] thay cho IN
     }
 
     // ==========================================
-    // 1. TÍNH TOÁN KHOẢNG THỜI GIAN THEO LỊCH CHUẨN (CALENDAR)
+    // 3. TÍNH TOÁN KHOẢNG THỜI GIAN THEO LỊCH CHUẨN (CALENDAR)
     // ==========================================
     const now = new Date();
     let startDate = new Date();
@@ -36,19 +64,16 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
 
     // ==========================================
     // MỚI: ĐỊNH NGHĨA DANH SÁCH TRẠNG THÁI ĐÃ THANH TOÁN 
-    // (Bỏ qua pending, cancelled, return)
     // ==========================================
     const paidStatuses = ['complete', 'processing', 'in_transit', 'done', 'delivered'];
     let total_supported_orders = 0;
     let total_saved_amount = 0;
-    // Tính toán KPI Tổng quan cho Card (CHỈ CỘNG TIỀN ĐƠN ĐÃ THANH TOÁN)
+    
     const total_revenue = orders.reduce((sum: number, order: any) => {
-      // Đếm số lượng đơn hỗ trợ và tổng số tiền seller tiết kiệm được
       if (order.status === 'support') {
         total_supported_orders++;
         total_saved_amount += Number(order.order_price || 0);
       }
-      // Tính tổng doanh thu
       if (paidStatuses.includes(order.status)) {
         return sum + Number(order.order_price || 0);
       }
@@ -58,7 +83,7 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
     const total_orders = orders.length;
 
     // ==========================================
-    // 2. CHIA BUCKET (CỘT BIỂU ĐỒ) THEO LỊCH THỰC TẾ
+    // 4. CHIA BUCKET (CỘT BIỂU ĐỒ) THEO LỊCH THỰC TẾ
     // ==========================================
     let revenueBuckets: Record<string, { revenue: number, orders: number }> = {};
     
@@ -75,11 +100,8 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
       revenueBuckets = { 'Q1': { revenue:0, orders:0 }, 'Q2': { revenue:0, orders:0 }, 'Q3': { revenue:0, orders:0 }, 'Q4': { revenue:0, orders:0 } };
     }
 
-    // Phân bổ đơn hàng vào đúng cột
     orders.forEach((order: any) => {
       const orderDate = new Date(order.order_date);
-      
-      // CHỈ CỘNG TIỀN VÀO BIỂU ĐỒ NẾU ĐƠN ĐÃ THANH TOÁN
       const isPaid = paidStatuses.includes(order.status);
       const price = isPaid ? Number(order.order_price || 0) : 0;
 
@@ -102,7 +124,7 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
 
       if (revenueBuckets[bucketKey]) {
         revenueBuckets[bucketKey].revenue += price;
-        revenueBuckets[bucketKey].orders += 1; // Số lượng đơn hàng (Cột xanh lá) thì vẫn đếm đủ để biết lượng traffic
+        revenueBuckets[bucketKey].orders += 1;
       }
     });
 
@@ -113,7 +135,7 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
     }));
 
     // ==========================================
-    // 3. CHUẨN BỊ DỮ LIỆU BIỂU ĐỒ TRÒN (STATUS)
+    // 5. CHUẨN BỊ DỮ LIỆU BIỂU ĐỒ TRÒN (STATUS)
     // ==========================================
     const statusMap: Record<string, { name: string, value: number, color: string }> = {
       'pending': { name: 'Chờ thanh toán', value: 0, color: '#f59e0b' },
@@ -133,7 +155,6 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
       }
     });
 
-    // Gom các status bị trùng định nghĩa (VD: done và delivered)
     const consolidatedStatusMap: Record<string, { name: string, value: number, color: string }> = {};
     Object.values(statusMap).forEach(item => {
       if (item.value > 0) {
@@ -148,62 +169,28 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
     const statusChart = Object.values(consolidatedStatusMap);
 
     // ==========================================
-    // 4. TÍNH TOÁN TĂNG TRƯỞNG ĐƠN HÀNG (THÁNG NÀY VS THÁNG TRƯỚC)
+    // 6. TÍNH TOÁN CÔNG NỢ & LỊCH SỬ THANH TOÁN
     // ==========================================
-    const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const endOfCurrentMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-    
-    const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
-
-    const baseFilter = shop_id ? { shop_id } : {};
-
-    const [currentMonthOrders, lastMonthOrders] = await Promise.all([
-      sellerService.listSellerOrders({ ...baseFilter, order_date: { $gte: startOfCurrentMonth, $lte: endOfCurrentMonth } }),
-      sellerService.listSellerOrders({ ...baseFilter, order_date: { $gte: startOfLastMonth, $lte: endOfLastMonth } })
-    ]);
-
-    const currentCount = currentMonthOrders.length;
-    const lastCount = lastMonthOrders.length;
-
-    let growthRate = 0;
-    if (lastCount === 0) {
-      growthRate = currentCount > 0 ? 100 : 0;
-    } else {
-      growthRate = ((currentCount - lastCount) / lastCount) * 100;
-    }
-
-    const order_growth = {
-      current: currentCount,
-      last: lastCount,
-      growth: Math.abs(parseFloat(growthRate.toFixed(1))),
-      isUp: growthRate >= 0
-    };
+    // Dùng lại bộ lọc đã có myShopIds
     const paymentHistory = await sellerService.listPaymentHistories(
-      shop_id ? { shop_id } : {}, 
+      filters.shop_id ? { shop_id: filters.shop_id } : {}, 
       { order: { created_at: "DESC" } } 
     ) || [];
 
-    // ==========================================
-    // 6. TRẢ KẾT QUẢ VỀ FRONTEND
-    // ==========================================
     const total_paid = paymentHistory.reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
 
-    // Tính tổng nợ phát sinh toàn thời gian
-    const allTimeOrders = await sellerService.listSellerOrders(shop_id ? { shop_id } : {});
+    const allTimeOrders = await sellerService.listSellerOrders(filters.shop_id ? { shop_id: filters.shop_id } : {});
     let total_debt_generated = 0;
     allTimeOrders.forEach((o: any) => {
-      // Chỉ tính nợ các đơn đã qua giai đoạn Pay
       if (paidStatuses.includes(o.status)) {
         total_debt_generated += Number(o.order_price || 0);
       }
     });
 
-    // Công nợ hiện tại = Tổng nợ phát sinh - Tổng đã trả
     const current_debt = total_debt_generated - total_paid;
 
     // ==========================================
-    // 6. TRẢ KẾT QUẢ VỀ FRONTEND
+    // 7. TRẢ KẾT QUẢ VỀ FRONTEND
     // ==========================================
     res.json({
       stats: {
