@@ -24,7 +24,7 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
 }
 export async function POST(req: MedusaRequest, res: MedusaResponse) {
   try {
-    const sellerService = req.scope.resolve("sellerModuleService");
+    const sellerService = req.scope.resolve("sellerModuleService") as any;
     const { name } = req.body as { name: string };
 
     if (!name || name.trim() === "") {
