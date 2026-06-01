@@ -3,7 +3,7 @@ import jwt from "jsonwebtoken";
 
 export async function GET(req: MedusaRequest, res: MedusaResponse) {
   try {
-    // --- KHỐI BẢO MẬT MỚI (TỰ GIẢI MÃ TOKEN) ---
+    // 1. KIỂM TRA TOKEN BẢO MẬT
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return res.status(401).json({ error: "Chưa đăng nhập hoặc thiếu Token!" });
@@ -17,24 +17,13 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
     } catch (err) {
       return res.status(401).json({ error: "Token hết hạn hoặc không hợp lệ!" });
     }
-    // ------------------------------------------
 
-    const query = req.scope.resolve("query");
+    // 2. LẤY DANH SÁCH SHOP BẰNG SERVICE THAY VÌ GRAPH
+    const sellerService = req.scope.resolve("sellerModuleService") as any;
     
-    // 2. LỌC CỬA HÀNG THEO ĐÚNG SELLER_ID ĐANG ĐĂNG NHẬP
-    const { data: shops } = await query.graph({
-      entity: "shop",
-      fields: [
-        "id", 
-        "name", 
-        "is_active", 
-        "logo_url",  
-        "tax_id",
-        "seller_id" // Thêm trường này trả về để dễ kiểm tra
-      ], 
-      filters: {
-        seller_id: currentSellerId // <--- BỘ LỌC CHỐT CHẶN BẢO MẬT
-      }
+    // Tự động lọc ra đúng các cửa hàng của Seller này
+    const shops = await sellerService.listShops({ 
+      seller_id: currentSellerId 
     });
 
     res.json({ status: "success", shops });
