@@ -4,7 +4,7 @@ import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http";
 export async function GET(req: MedusaRequest, res: MedusaResponse) {
   try {
     const { id } = req.params;
-    const sellerService = req.scope.resolve("sellerModuleService");
+    const sellerService = req.scope.resolve("sellerModuleService") as any;
     
     // Lấy chi tiết đơn hàng kèm theo quan hệ shop
     const order = await sellerService.retrieveSellerOrder(id, {
