@@ -122,23 +122,23 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
       if (!order.items || order.items.length === 0) continue;
 
       for (const item of order.items) {
-        // THAY ĐỔI 1: Bổ sung replace để quét sạch mọi khoảng trắng kép và ký tự ẩn
+        // Dọn dẹp khoảng trắng kép và ký tự ẩn từ file CSV
         const safeType = item.type ? item.type.replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/\s+/g, ' ').trim().toLowerCase() : "";
         const safeSku = item.sku ? item.sku.replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/\s+/g, ' ').trim().toLowerCase() : "";
         
-        // THAY ĐỔI 2: Đổi toàn bộ b.name thành b.product_type
+        // LUỒNG CŨ: Tìm kiếm dựa trên cột 'name' của bảng pod_blank
         const matchedBlank = allBlanks.find(b => 
           (safeSku && b.sku?.toLowerCase() === safeSku) || 
-          (safeType && b.product_type?.toLowerCase() === safeType)
+          (safeType && b.name?.toLowerCase() === safeType)
         );
 
         if (matchedBlank) {
-          // THAY ĐỔI 3: Gán lại đúng tên trường
-          item.type = matchedBlank.product_type;
+          // QUAN TRỌNG: Gán lại đúng tên phôi chuẩn từ pod_blank để mang xuống bước tính giá
+          item.type = matchedBlank.name;
 
           // Kiểm tra hết hàng toàn bộ phôi
           if (matchedBlank.in_stock === false) {
-            outOfStockErrors.push(`Đơn [${order.external_order_id}]: Phôi "${matchedBlank.product_type}" hiện đang HẾT HÀNG toàn bộ.`);
+            outOfStockErrors.push(`Đơn [${order.external_order_id}]: Phôi "${matchedBlank.name}" hiện đang HẾT HÀNG toàn bộ.`);
           } 
           // Kiểm tra hết hàng theo từng phân loại (Color x Size)
           else if (matchedBlank.out_of_stock_variants && Array.isArray(matchedBlank.out_of_stock_variants)) {
@@ -148,11 +148,10 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
             );
             
             if (isVariantOos) {
-              outOfStockErrors.push(`Đơn [${order.external_order_id}]: Phôi "${matchedBlank.product_type}" (Màu: ${item.color}, Size: ${item.size}) hiện đang HẾT HÀNG.`);
+              outOfStockErrors.push(`Đơn [${order.external_order_id}]: Phôi "${matchedBlank.name}" (Màu: ${item.color}, Size: ${item.size}) hiện đang HẾT HÀNG.`);
             }
           }
         } else {
-          // Báo lỗi nếu không khớp được cả SKU lẫn Tên
           unknownProductErrors.push(`Đơn [${order.external_order_id}]: Dữ liệu "${item.type || item.sku}" không khớp với bất kỳ SKU hay Tên phôi nào trên hệ thống.`);
         }
       }
