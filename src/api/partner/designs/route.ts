@@ -42,7 +42,7 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
 // [POST] Thêm mới hoặc Cập nhật đè dữ liệu thiết kế theo SKU
 export async function POST(req: MedusaRequest, res: MedusaResponse) {
   try {
-    const sellerService = req.scope.resolve("sellerModuleService");
+    const sellerService = req.scope.resolve("sellerModuleService") as any;
     const { id, sku, design_front_url, design_back_url, mockup_url, shop_id } = req.body as {
     id?: string;
     sku: string;
