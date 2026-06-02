@@ -15,6 +15,7 @@ module.exports = defineConfig({
     }
   },
   admin: {
+    disable: false, // <--- ĐÂY LÀ "CHÌA KHÓA" ĐỂ ÉP SERVER BUILD GIAO DIỆN ADMIN
     backendUrl: "https://api.teementpod.us",
   },
   // BẮT ĐẦU THÊM ĐOẠN NÀY ĐỂ ĐĂNG KÝ MODULE SHOP
@@ -24,5 +25,4 @@ module.exports = defineConfig({
     },
   },
   // KẾT THÚC PHẦN THÊM MỚI
-  // ... phần còn lại giữ nguyên (nếu có)
 })
