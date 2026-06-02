@@ -122,6 +122,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
 
     // --- 2. KHỐI BẢO MẬT: KIỂM TRA QUYỀN SỞ HỮU SHOP TRƯỚC KHI IMPORT ---
     let markupFee = 0;
+    let perOrderFee = 0;
     const currentShopInfo = await sellerService.listShops(
       { id: target_shop_id }, 
       { relations: ["seller"] }
@@ -148,6 +149,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
 
     if (targetShop.seller) {
       markupFee = targetShop.seller.markup_fee || 0;
+      perOrderFee = Number(targetShop.seller.per_order_fee || 0);
     }
     // -------------------------------------------------------------------
 
@@ -331,7 +333,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
       }
 
       orderData.shipping_cost = totalShippingCost;
-      orderData.order_price = totalCalculatedPrice + totalShippingCost; 
+      orderData.order_price = totalCalculatedPrice + totalShippingCost + perOrderFee;
     }
 
     const extractedIds = formattedOrders.map((o: any) => o.external_order_id);
