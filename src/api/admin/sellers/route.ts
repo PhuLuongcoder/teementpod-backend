@@ -9,11 +9,18 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
     // 1. Kéo danh sách Seller cho UI Admin
     // ==========================================
     const sellers = await sellerService.listSellers({}, {
+      // Có thể thêm mảng select nếu Medusa của bạn yêu cầu tường minh, 
+      // nhưng thường để trống nó sẽ lấy hết.
       relations: ["shops"]
     });
 
+    // TEST: In ra màn hình console Backend xem đã có cột per_order_fee chưa
+    if (sellers.length > 0) {
+      console.log("Dữ liệu Seller mẫu:", sellers[0]);
+    }
+
     // ==========================================
-    // 2.Tính toán Stats & Charts
+    // 2.Tính toán Stats & Charts (Của bạn)
     // ==========================================
     const filters: any = {};
     if (shop_id) filters.shop_id = shop_id;
@@ -34,7 +41,7 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
     // ==========================================
     res.json({
       status: "success",
-      sellers: sellers,     
+      sellers: sellers,      
       stats: {            
         total_revenue: 12500,
         total_orders: 450,
