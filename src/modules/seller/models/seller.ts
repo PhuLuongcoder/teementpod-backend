@@ -11,5 +11,6 @@ export const Seller = model.define("seller", {
   phone: model.text().nullable(),
   is_active: model.boolean().default(true),
   markup_fee: model.float().default(0),
+  per_order_fee: model.number().default(0),
   shops: model.hasMany(() => Shop), 
 })
