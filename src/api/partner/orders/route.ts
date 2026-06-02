@@ -193,7 +193,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     });
 
 
-    const outOfStockErrors: string[] = [];
+    /*const outOfStockErrors: string[] = [];
     const unknownProductErrors: string[] = [];
 
     const allBlanks = await sellerService.listPodBlanks({}) as any[];
@@ -241,7 +241,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
         error: `Tải file thất bại! Phát hiện sản phẩm không hợp lệ:\n\n${displayErrors}${moreText}\n\n-> Vui lòng sửa lại file CSV hoặc báo Admin thêm phôi.` 
       });
     }
-
+*/
     for (const orderData of formattedOrders) {
       if (!orderData.items || orderData.items.length === 0) continue;
 
