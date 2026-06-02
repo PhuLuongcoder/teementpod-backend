@@ -669,7 +669,7 @@ export default function SellersAdminPage() {
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         {/* CỘT 1: QUẢN LÝ SELLER (1/3 màn hình) */}
         <div className="xl:col-span-1 flex flex-col gap-y-4">
-          <h2 className="font-semibold text-gray-800 uppercase text-sm tracking-wider">Danh sách Seller</h2>
+          <h2 className="font-semibold text-gray-800 uppercase text-sm tracking-wider">Danh sách Seller - Newest</h2>
           {sellers.map(seller => {
             const displayName = seller.name || 
               [seller.last_name, seller.first_name].filter(Boolean).join(" ") || 
