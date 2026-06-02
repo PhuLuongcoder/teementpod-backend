@@ -286,8 +286,9 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
       if (!orderData.items || orderData.items.length === 0) continue;
 
       let totalCalculatedPrice = 0;
-      let totalShippingCost = 0; 
+      let totalItemsCount = 0; 
       
+      // 1. KẾT NỐI DATABASE: Lấy cấu hình giá từ giao diện Admin
       const orderCountry = orderData.shipping_address?.country?.toUpperCase() 
                         || orderData.shipping_address?.country_code?.toUpperCase() 
                         || 'US';
@@ -298,12 +299,14 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
 
       if (shipConfigs.length === 0) {
         shipConfigs = await sellerService.listShippingPrices({
-          country_code: 'WW'
+          country_code: 'WW' // Nếu không tìm thấy US/CA, mặc định lấy cấu hình của WW (Toàn cầu)
         }) as any[];
       }
 
+      // Nếu chưa cài đặt trên UI, mặc định lấy số 0
       const shipCfg = shipConfigs.length > 0 ? shipConfigs[0] : { first_item_cost: 0, additional_item_cost: 0 };
 
+      // 2. TÍNH TIỀN PHÔI VÀ ĐẾM TỔNG SỐ LƯỢNG SẢN PHẨM
       for (const item of orderData.items) {
         const safeType = item.type ? item.type.trim() : "";
         const safeSize = item.size ? item.size.trim() : "";
@@ -327,13 +330,20 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
         
         const itemQty = item.quantity || 1;
         totalCalculatedPrice += (unitPrice * itemQty);
-
-        const itemShippingCost = shipCfg.first_item_cost + (Math.max(0, itemQty - 1) * shipCfg.additional_item_cost);
-        totalShippingCost += itemShippingCost;
+        totalItemsCount += itemQty; 
       }
 
-      orderData.shipping_cost = totalShippingCost;
-      orderData.order_price = totalCalculatedPrice + totalShippingCost + perOrderFee;
+      // 3. THUẬT TOÁN TÍNH CHIẾT KHẤU KỲ DIỆU
+      // Ép kiểu Number để đảm bảo an toàn toán học
+      const firstItemCost = Number(shipCfg.first_item_cost) || 0;
+      const additionalItemCost = Number(shipCfg.additional_item_cost) || 0;
+
+      // Nếu bạn nhập số âm trên UI, biến totalShippingCost sẽ tự động trở thành SỐ ÂM (Chiết khấu)
+      const totalShippingCost = firstItemCost + (Math.max(0, totalItemsCount - 1) * additionalItemCost);
+
+      // Gán vào đơn hàng
+      orderData.shipping_cost = totalShippingCost; 
+      orderData.order_price = totalCalculatedPrice + totalShippingCost + perOrderFee; // Cộng số âm = Trừ tiền!
     }
 
     const extractedIds = formattedOrders.map((o: any) => o.external_order_id);
