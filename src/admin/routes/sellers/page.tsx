@@ -109,6 +109,17 @@ export default function SellersAdminPage() {
       fetchData(currentPage);
     }
   };
+  const handleUpdatePerOrderFee = async (sellerId: string, currentFee: number) => {
+    const val = prompt("Nhập phí xử lý mỗi đơn hàng (Per Order Fee) cho Seller này ($):", currentFee.toString());
+    if(val !== null && !isNaN(Number(val))) {
+      await fetch(`/admin/sellers/${sellerId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ per_order_fee: Number(val) }) // Đẩy biến mới lên API
+      });
+      fetchData(currentPage);
+    }
+  };
   // Tự động fetch lại dữ liệu khi currentPage thay đổi
   useEffect(() => {
     fetchData(currentPage)
@@ -673,10 +684,19 @@ export default function SellersAdminPage() {
                   </span>
                 </div>
                 
-                {/* Khu vực cấu hình phí Markup */}
-                <div className="flex justify-between items-center mb-4 text-xs bg-gray-50 p-2 rounded border border-gray-100">
-                  <span className="text-gray-600">Phí cộng thêm: <strong className="text-green-600">+${seller.markup_fee || 0}</strong></span>
-                  <button onClick={() => handleUpdateMarkup(seller.id, seller.markup_fee || 0)} className="text-blue-600 font-semibold hover:underline">Sửa phí</button>
+                {/* Khu vực cấu hình Phí kinh doanh */}
+                <div className="flex flex-col gap-2 mb-4 text-xs bg-gray-50 p-2 rounded border border-gray-100">
+                  {/* Phí 1: Markup (Cộng trên mỗi sản phẩm) */}
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">Phí in thêm (Markup): <strong className="text-green-600">+${seller.markup_fee || 0}</strong></span>
+                    <button onClick={() => handleUpdateMarkup(seller.id, seller.markup_fee || 0)} className="text-blue-600 font-semibold hover:underline">Sửa phí</button>
+                  </div>
+                  
+                  {/* Phí 2: Per Order Fee (Cộng 1 lần cho 1 ID đơn) */}
+                  <div className="flex justify-between items-center border-t border-gray-200 pt-2">
+                    <span className="text-gray-600">Phí xử lý đơn (Per Order): <strong className="text-orange-600">+${seller.per_order_fee || 0}/đơn</strong></span>
+                    <button onClick={() => handleUpdatePerOrderFee(seller.id, seller.per_order_fee || 0)} className="text-blue-600 font-semibold hover:underline">Sửa phí</button>
+                  </div>
                 </div>
                 
                 <div className="space-y-2">
