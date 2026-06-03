@@ -366,7 +366,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
       if (existingOrderMap.has(orderData.external_order_id)) {
         // --- NẾU ĐƠN HÀNG ĐÃ TỒN TẠI -> THỰC HIỆN UPDATE ---
         const internalOrderId = existingOrderMap.get(orderData.external_order_id);
-        const { order_date, created_at, updated_at, ...updatePayload } = orderData;
+        const { order_date, created_at, updated_at, status, ...updatePayload } = orderData;
         try {
           await sellerService.updateSellerOrders({
             id: internalOrderId,
