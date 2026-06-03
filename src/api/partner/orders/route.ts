@@ -353,34 +353,50 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
       shop_id: target_shop_id
     });
     
-    const existingIdSet = new Set(existingOrders.map((o: any) => o.external_order_id));
+    const existingOrderMap = new Map();
+    existingOrders.forEach((o: any) => {
+      existingOrderMap.set(o.external_order_id, o.id);
+    });
     
     let createdCount = 0;
+    let updatedCount = 0;
     const skippedOrderIds: string[] = [];
 
     for (const orderData of formattedOrders) {
-      if (existingIdSet.has(orderData.external_order_id)) {
-        skippedOrderIds.push(orderData.external_order_id);
-        continue;
+      if (existingOrderMap.has(orderData.external_order_id)) {
+        // --- NẾU ĐƠN HÀNG ĐÃ TỒN TẠI -> THỰC HIỆN UPDATE ---
+        const internalOrderId = existingOrderMap.get(orderData.external_order_id);
+        
+        try {
+          await sellerService.updateSellerOrders({
+            id: internalOrderId,
+            ...orderData
+          });
+          updatedCount++;
+        } catch (updateErr) {
+          console.error("Lỗi cập nhật đơn hàng:", updateErr);
+          skippedOrderIds.push(orderData.external_order_id);
+        }
+      } else {
+        // --- NẾU ĐƠN HÀNG MỚI -> TẠO MỚI (Dành cho Import CSV) ---
+        await sellerService.createSellerOrders(orderData);
+        createdCount++;
       }
-      
-      await sellerService.createSellerOrders(orderData);
-      createdCount++;
     }
 
-    let responseMessage = `Đã đồng bộ thành công ${createdCount} đơn hàng mới!`;
+    let responseMessage = `Đã đồng bộ thành công! (Tạo mới: ${createdCount} đơn, Cập nhật: ${updatedCount} đơn).`;
     
     if (skippedOrderIds.length > 0) {
       const displayIds = skippedOrderIds.slice(0, 5).join(', ');
       const moreText = skippedOrderIds.length > 5 ? `... và ${skippedOrderIds.length - 5} mã khác` : '';
-      responseMessage += `\n Bỏ qua ${skippedOrderIds.length} đơn bị trùng ID: ${displayIds} ${moreText}`;
+      responseMessage += `\nLỗi/Bỏ qua ${skippedOrderIds.length} đơn: ${displayIds} ${moreText}`;
     }
 
     res.json({ 
       status: "success", 
       message: responseMessage,
       count: createdCount,
-      skipped: skippedOrderIds.length
+      updated: updatedCount
     });
 
   } catch (error: any) {
