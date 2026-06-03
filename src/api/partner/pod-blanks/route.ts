@@ -34,11 +34,13 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
 
     // 3. Lấy toàn bộ phôi hệ thống (Giữ nguyên luồng chuẩn của bạn, không có filter seller_id)
     const catalog = await sellerService.listPodBlanks({}, { order: { created_at: "DESC" } });
-
+    console.log("SAMPLE BLANK KEYS:", Object.keys(catalog[0] || {})); // Xem trường thực tế là gì
+    console.log("BLANK NAME CHECK:", catalog.map((b: any) => b.name).slice(0, 5));
+  
     // 4. TÍNH TOÁN GIÁ AN TOÀN (Đề phòng display_price trong DB bị rỗng)
     const adjustedCatalog = catalog.map((blank: any) => ({
       ...blank,
-      // Ép kiểu về Number, nếu null/undefined thì gán = 0 trước khi cộng
+      name: blank.name || blank.title || blank.product_name || `Phôi #${blank.id}`,
       display_price: Number(blank.display_price || 0) + markupFee
     }));
 
