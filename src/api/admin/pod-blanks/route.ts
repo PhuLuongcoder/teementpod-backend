@@ -10,6 +10,18 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
   }
 }
 
+// HÀM BẢO VỆ: Parse JSON an toàn không bao giờ crash
+const safeParseJSON = (val: any) => {
+  if (!val) return [];
+  if (Array.isArray(val)) return val;
+  try {
+    return JSON.parse(val);
+  } catch (e) {
+    // Nếu JSON.parse lỗi, tự động tách chuỗi theo dấu phẩy thành mảng
+    return String(val).split(',').map(s => s.trim()).filter(Boolean);
+  }
+};
+
 export async function POST(req: MedusaRequest, res: MedusaResponse) {
   try {
     const sellerService = req.scope.resolve("sellerModuleService") as any;
@@ -22,19 +34,26 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
       return res.status(400).json({ error: "Thiếu thông tin SKU hoặc Tên phôi sản phẩm" });
     }
 
+    // BẢO VỆ 1: Chống lỗi "column nan does not exist"
+    let safePrice = Number(display_price);
+    if (isNaN(safePrice)) {
+      safePrice = 0;
+    }
+
     const payload = {
-      sku: sku.trim(),
-      name: name.trim(),
-      image_url: image_url || null,
-      material: material || null,
+      sku: String(sku).trim(),
+      name: String(name).trim(),
+      image_url: image_url ? String(image_url).trim() : null,
+      material: material ? String(material).trim() : null,
       in_stock: Boolean(in_stock),
-      display_price: Number(display_price || 0),
-      category: category ? category.trim() : "Khác",
-      description: description || null,
-      // Đảm bảo dữ liệu JSON được chuẩn hóa trước khi ghi vào Database
-      colors: colors ? (Array.isArray(colors) ? colors : JSON.parse(colors)) : [],
-      sizes: sizes ? (Array.isArray(sizes) ? sizes : JSON.parse(sizes)) : [],
-      out_of_stock_variants: out_of_stock_variants ? (Array.isArray(out_of_stock_variants) ? out_of_stock_variants : JSON.parse(out_of_stock_variants)) : []
+      display_price: safePrice, // <-- Dùng biến an toàn
+      category: category ? String(category).trim() : "Khác",
+      description: description ? String(description).trim() : null,
+      
+      // BẢO VỆ 2: Sử dụng hàm safeParseJSON
+      colors: safeParseJSON(colors),
+      sizes: safeParseJSON(sizes),
+      out_of_stock_variants: safeParseJSON(out_of_stock_variants)
     };
 
     let blank;
@@ -43,6 +62,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     } else {
       blank = await sellerService.createPodBlanks(payload);
     }
+    
     res.json({ status: "success", blank });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
