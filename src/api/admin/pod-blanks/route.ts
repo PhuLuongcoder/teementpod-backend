@@ -59,7 +59,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
 
     // THUẬT TOÁN ĐỌC CSV MỚI: Bắt chuẩn xác kể cả các cột trống (,,)
     const parseCsvLine = (text: string) => {
-      const result = [];
+      const result: string[] = [];
       let current = '';
       let inQuotes = false;
       for (let i = 0; i < text.length; i++) {
