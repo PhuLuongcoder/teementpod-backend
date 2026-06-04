@@ -137,7 +137,10 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
       }
     }
 
-    res.json({ status: "success", message: `Thành công! Đã tạo mới: ${createdCount} | Cập nhật: ${updatedCount} ${skipCount > 0 ? \`| Bỏ qua lỗi: ${skipCount}\` : ''}` });
+    res.json({ 
+      status: "success", 
+      message: `Thành công! Đã tạo mới: ${createdCount} | Cập nhật: ${updatedCount} ${skipCount > 0 ? '| Bỏ qua lỗi: ' + skipCount : ''}` 
+    });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
