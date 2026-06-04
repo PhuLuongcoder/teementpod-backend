@@ -21,23 +21,45 @@ export default function PodBlanksAdminPage() {
   }
   const [form, setForm] = useState<any>(defaultForm)
   
-  // Ref quản lý File Upload CSV
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const fetchBlanks = async () => {
     setLoading(true)
-    const res = await fetch("/admin/pod-blanks", { credentials: "include" }).then(r => r.json())
-    setBlanks(res.blanks || [])
-    setLoading(false)
+    try {
+      const res = await fetch("/admin/pod-blanks", { credentials: "include" }).then(r => r.json())
+      setBlanks(res.blanks || [])
+    } catch (e) {
+      console.error("Lỗi tải danh sách phôi:", e)
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => { fetchBlanks() }, [])
 
   // ==========================================
-  // LOGIC CSV: XUẤT VÀ NHẬP
+  // XUẤT VÀ NHẬP CSV (ĐÃ FIX LỖI BLOB + 401)
   // ==========================================
-  const handleExportCSV = () => {
-    window.location.href = "/admin/pod-blanks/csv";
+  const handleExportCSV = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch("/admin/pod-blanks/csv", { credentials: "include" });
+      if (!response.ok) throw new Error("Không có quyền tải hoặc lỗi Server");
+      
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "pod_blanks_catalog.csv";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      alert("Lỗi xuất file. Hãy F5 tải lại trang để làm mới phiên đăng nhập!");
+    } finally {
+      setLoading(false);
+    }
   }
 
   const handleImportCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -132,7 +154,6 @@ export default function PodBlanksAdminPage() {
 
   return (
     <div className="flex flex-col gap-y-6">
-      {/* HEADER SECTION CÓ THÊM NÚT CSV */}
       <div className="flex justify-between items-center">
         <Heading>Quản lý Kho Phôi & Tồn Kho Biến Thể</Heading>
         <div className="flex gap-x-2">
@@ -152,7 +173,6 @@ export default function PodBlanksAdminPage() {
         </div>
       </div>
       
-      {/* FORM THÊM / SỬA */}
       <Container className="p-6">
         <form onSubmit={handleSave} className="grid grid-cols-6 gap-4 items-start">
           <div className="col-span-1">
