@@ -117,6 +117,7 @@ export default function SellersAdminPage() {
       fetchData(currentPage);
     }
   };
+  
   const handleUpdatePerOrderFee = async (sellerId: string, currentFee: number) => {
     const val = prompt("Nhập phí xử lý mỗi đơn hàng (Per Order Fee) cho Seller này ($):", currentFee.toString());
     if(val !== null && !isNaN(Number(val))) {
@@ -916,11 +917,14 @@ export default function SellersAdminPage() {
       </div>
 
       {/* ================================================= */}
-      {/* POPUP DUYỆT ĐI LẠI ĐƠN (RESHIP) CHỈ DÀNH CHO TAB SUPPORT */}
+      {/* POPUP DUYỆT ĐI LẠI ĐƠN (RESHIP) */}
       {/* ================================================= */}
       {isReshipModalOpen && (
         <FocusModal open={isReshipModalOpen} onOpenChange={setIsReshipModalOpen}>
-          <FocusModal.Content>
+          {/* fix cho Radix UI */}
+          <FocusModal.Content aria-describedby="reship-desc">
+            <span id="reship-desc" className="sr-only">Popup thao tác duyệt lại đơn reship</span>
+            
             <FocusModal.Header>
               <Heading>Cấu hình & Duyệt đi lại đơn (Reship)</Heading>
             </FocusModal.Header>
@@ -969,11 +973,14 @@ export default function SellersAdminPage() {
       )}
 
       {/* ================================================= */}
-      {/* POPUP IMPORT TRACKING CSV BẰNG MEDUSA UI */}
+      {/* POPUP IMPORT TRACKING CSV */}
       {/* ================================================= */}
       {isTrackingModalOpen && (
         <FocusModal open={isTrackingModalOpen} onOpenChange={setIsTrackingModalOpen}>
-          <FocusModal.Content>
+          {/* fix cho Radix UI */}
+          <FocusModal.Content aria-describedby="tracking-desc">
+            <span id="tracking-desc" className="sr-only">Popup tải file mã vận đơn Tracking</span>
+
             <FocusModal.Header>
               <div className="flex items-center gap-x-4">
                 <Heading>Đồng bộ Mã Vận Đơn từ Xưởng (Import Tracking)</Heading>
@@ -1045,30 +1052,40 @@ export default function SellersAdminPage() {
       )}
 
       {/* ================================================= */}
-      {/* MODAL CHI TIẾT ĐƠN HÀNG (KÈM NÚT SỬA) */}
+      {/* MODAL CHI TIẾT ĐƠN HÀNG (CÓ BANNER EDIT MỚI TRONG BODY) */}
       {/* ================================================= */}
       {viewingOrder && (
         <FocusModal open={!!viewingOrder} onOpenChange={(open) => !open && setViewingOrder(null)}>
-          <FocusModal.Content>
+          {/* fix cho Radix UI */}
+          <FocusModal.Content aria-describedby="detail-desc">
+            <span id="detail-desc" className="sr-only">Hiển thị thông tin chi tiết đơn hàng</span>
+            
+            {/* Header trả về mặc định, bỏ các nút can thiệp CSS của Medusa */}
             <FocusModal.Header>
-              <div className="flex justify-between items-center w-full pr-4">
-                <div className="flex items-center gap-x-4">
-                  <Heading>Chi tiết đơn hàng: {viewingOrder.external_order_id}</Heading>
-                  <Badge color={viewingOrder.status === 'pending' ? 'orange' : viewingOrder.status === 'processing' ? 'blue' : viewingOrder.status === 'cancelled' ? 'red' : 'green'}>
-                    {viewingOrder.status}
-                  </Badge>
-                </div>
-                {/* Chỉ cho sửa khi đơn đang chờ duyệt (pending) hoặc chờ in (processing), complete là paid theo code cũ */}
-                {['pending', 'processing', 'complete'].includes(viewingOrder.status) && (
-                  <Button variant="secondary" className="bg-gray-900 text-white hover:bg-gray-800" onClick={handleOpenEditDrawer}>
-                    Chỉnh sửa đơn hàng
-                  </Button>
-                )}
+              <div className="flex items-center gap-x-4">
+                <Heading>Chi tiết đơn hàng: {viewingOrder.external_order_id}</Heading>
+                <Badge color={viewingOrder.status === 'pending' ? 'orange' : viewingOrder.status === 'processing' ? 'blue' : viewingOrder.status === 'cancelled' ? 'red' : 'green'}>
+                  {viewingOrder.status}
+                </Badge>
               </div>
             </FocusModal.Header>
+            
             <FocusModal.Body className="p-8 bg-gray-50 overflow-y-auto max-h-[calc(100vh-120px)]">
+              
+              {/* KHỐI BANNER CHỈNH SỬA (Đưa vào Body để chắc chắn hiển thị 100%) */}
+              {['pending', 'processing', 'complete'].includes(viewingOrder.status) && (
+                <div className="max-w-5xl mx-auto mb-6 bg-blue-50 border border-blue-200 p-4 rounded-xl flex justify-between items-center shadow-sm">
+                  <div>
+                    <h3 className="font-bold text-blue-900 text-base">Cập nhật thông tin đơn hàng</h3>
+                    <p className="text-sm text-blue-700">Chỉnh sửa địa chỉ giao hàng, số điện thoại, tên khách và ghi chú.</p>
+                  </div>
+                  <Button variant="secondary" className="bg-blue-600 border-none text-white hover:bg-blue-700 shadow-md px-6" onClick={handleOpenEditDrawer}>
+                    Mở Form Chỉnh Sửa
+                  </Button>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-6 max-w-5xl mx-auto">
-                
                 <Container className="p-6 bg-white shadow-sm border border-gray-100">
                   <Heading level="h2" className="mb-4 text-gray-400 text-xs uppercase tracking-widest border-b pb-2">Thông tin khách hàng</Heading>
                   <div className="space-y-3">
@@ -1182,9 +1199,14 @@ export default function SellersAdminPage() {
       {/* ================================================= */}
       {isEditDialogOpen && viewingOrder && (
         <Drawer open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-          <Drawer.Content className="z-[9999] border-l border-gray-200 shadow-2xl">
+          {/* fix cho Radix UI */}
+          <Drawer.Content aria-describedby="drawer-desc" className="z-[9999] border-l border-gray-200 shadow-2xl">
             <Drawer.Header>
               <Drawer.Title>Chỉnh sửa ID: {viewingOrder.external_order_id}</Drawer.Title>
+              {/* Thẻ Description ẩn bắt buộc cho a11y */}
+              <Drawer.Description id="drawer-desc" className="sr-only">
+                Form cập nhật dữ liệu của khách hàng
+              </Drawer.Description>
             </Drawer.Header>
             <Drawer.Body className="p-6 overflow-y-auto">
               <form id="edit-order-form" onSubmit={handleEditSubmit} className="space-y-5">
