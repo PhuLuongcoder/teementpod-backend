@@ -2,18 +2,18 @@ import { loadEnv, defineConfig } from "@medusajs/framework/utils"
 
 loadEnv(process.env.NODE_ENV || "development", process.cwd())
 
-// THAY URL NÀY BẰNG ĐÚNG TÊN MIỀN BẠN ĐANG DÙNG ĐỂ VÀO ADMIN (Không có dấu / ở cuối)
-const ADMIN_DOMAIN = process.env.ADMIN_CORS || "https://admin.teementpod.us" 
-const STORE_DOMAIN = process.env.STORE_CORS || "https://teementpod.us" // Tên miền cửa hàng bán hàng
+// CẤU HÌNH BAO PHỦ TẤT CẢ CÁC TÊN MIỀN BẠN CÓ THỂ DÙNG (Ngăn cách bằng dấu phẩy)
+// Cực kỳ quan trọng: Không được để dấu "/" ở cuối các đường link
+const ADMIN_DOMAIN = process.env.ADMIN_CORS || "https://api.teementpod.us,https://admin.teementpod.us,https://teementpod.us";
+const STORE_DOMAIN = process.env.STORE_CORS || "https://teementpod.us,https://api.teementpod.us";
 
 module.exports = defineConfig({
   projectConfig: {
     databaseUrl: process.env.DATABASE_URL,
     http: {
-      // CẤU HÌNH CORS CHUẨN ĐỂ KHÔNG BỊ LỖI COOKIE/401
       storeCors: STORE_DOMAIN,
       adminCors: ADMIN_DOMAIN,
-      authCors: ADMIN_DOMAIN, // authCors thường đi chung tên miền với admin
+      authCors: ADMIN_DOMAIN,
       jwtSecret: process.env.JWT_SECRET || "supersecret",
       cookieSecret: process.env.COOKIE_SECRET || "supersecret",
     }
