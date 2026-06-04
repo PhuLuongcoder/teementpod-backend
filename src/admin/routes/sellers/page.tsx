@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { defineRouteConfig } from "@medusajs/admin-sdk"
 import { Users, Trash, CheckCircleSolid, Spinner, ArrowDownTray, XCircleSolid, ArrowUturnLeft, ArrowUpTray } from "@medusajs/icons"
-import { Button, Container, Heading, Text, FocusModal, Badge, clx } from "@medusajs/ui"
+import { Button, Container, Heading, Text, FocusModal, Badge, clx, Drawer, Input, Label } from "@medusajs/ui"
 import Papa from "papaparse"
 
 // 1. CẤU HÌNH MENU BÊN TRÁI CHO MEDUSA ADMIN
@@ -44,6 +44,17 @@ export default function SellersAdminPage() {
   const [reshipReason, setReshipReason] = useState('Xưởng hỗ trợ in lại')
   const [isSubmittingReship, setIsSubmittingReship] = useState(false)
 
+  // === STATE QUẢN LÝ CHỈNH SỬA ĐƠN HÀNG ===
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [isSubmittingEdit, setIsSubmittingEdit] = useState(false)
+  const [editFormData, setEditFormData] = useState({
+    customer_name: "",
+    customer_phone: "",
+    customer_email: "",
+    shipping_address: "",
+    order_note: ""
+  })
+
   // Fetch dữ liệu từ 2 API Admin
   const fetchData = useCallback(async (page = 1) => {
     setIsLoading(true)
@@ -56,12 +67,9 @@ export default function SellersAdminPage() {
         endDate: endDate,
       });
 
-      // LOGIC TÁCH TAB MỚI:
       if (activeTab === 'reship') {
-        // Tab Reship: Bỏ qua status, chỉ tìm các đơn có tiền tố RS-
         params.append('search', searchQuery ? `${searchQuery} RS-` : 'RS-');
       } else {
-        // Các tab khác: Tìm theo Status bình thường
         if (searchQuery) params.append('search', searchQuery);
         if (activeTab !== 'all') params.append('status', activeTab);
       }
@@ -115,12 +123,12 @@ export default function SellersAdminPage() {
       await fetch(`/admin/sellers/${sellerId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ per_order_fee: Number(val) }) // Đẩy biến mới lên API
+        body: JSON.stringify({ per_order_fee: Number(val) })
       });
       fetchData(currentPage);
     }
   };
-  // Tự động fetch lại dữ liệu khi currentPage thay đổi
+
   useEffect(() => {
     fetchData(currentPage)
   }, [fetchData, currentPage])
@@ -135,18 +143,15 @@ export default function SellersAdminPage() {
     setSelectedIds([]);
   }
 
-  // Xử lý chọn tất cả
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) setSelectedIds(ordersList.map(o => o.id))
     else setSelectedIds([])
   }
 
-  // Xử lý chọn từng dòng
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])
   }
 
-  // Thao tác hàng loạt (Bulk Actions)
   const handleBulkAction = async (action: 'approve' | 'reject' | 'delete' | 'unapprove' | 'restore') => {
     if (action === 'delete' && !confirm(`Bạn có chắc chắn muốn xóa ${selectedIds.length} đơn hàng?`)) return;
     
@@ -166,7 +171,6 @@ export default function SellersAdminPage() {
     }
   }
 
-  // BỔ SUNG: Hàm đẩy đơn sang trạng thái tiếp theo xuyên phân trang
   const handlePushStatus = async (new_status: string) => {
     if (!confirm(`Bạn có chắc chắn muốn chuyển các đơn đã chọn sang trạng thái: ${new_status}?`)) return;
     
@@ -199,7 +203,7 @@ export default function SellersAdminPage() {
       setIsBulking(false);
     }
   }
-  // HÀM GỌI API RESHIP HÀNG LOẠT
+
   const handleBulkReship = async () => {
     setIsSubmittingReship(true);
     try {
@@ -230,22 +234,21 @@ export default function SellersAdminPage() {
   };
 
   const executeOrderAction = async (orderId: string, action: 'approve' | 'reject' | 'unapprove' | 'restore') => {
-    setActioningIds(prev => [...prev, orderId]); // Bật loading cho đơn này
+    setActioningIds(prev => [...prev, orderId]);
     try {
       await fetch('/admin/seller-orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ order_ids: [orderId], action })
       });
-      await fetchData(currentPage); // Reset data sau khi thành công
+      await fetchData(currentPage);
     } catch (error) {
       console.error(`Lỗi ${action} đơn:`, error);
     } finally {
-      setActioningIds(prev => prev.filter(id => id !== orderId)); // Tắt loading
+      setActioningIds(prev => prev.filter(id => id !== orderId));
     }
   }
   
-  // Hàm lấy chi tiết đơn hàng
   const openDetail = async (id: string) => {
     try {
       const res = await fetch(`/admin/seller-orders/${id}`, { credentials: 'include' }).then(r => r.json());
@@ -255,10 +258,71 @@ export default function SellersAdminPage() {
     }
   }
 
-  const renderProductColumn = (order: any) => {
-      // Dữ liệu giờ đã được parse sẵn thành mảng từ Backend
-      const itemsArray = order.items || [];
+  // === HÀM XỬ LÝ MỞ DRAWER VÀ SUBMIT EDIT ===
+  const handleOpenEditDrawer = () => {
+    if (!viewingOrder) return;
+    
+    let addressStr = "";
+    if (typeof viewingOrder.shipping_address === 'string') {
+      addressStr = viewingOrder.shipping_address;
+    } else {
+      addressStr = JSON.stringify(viewingOrder.shipping_address, null, 2);
+    }
 
+    setEditFormData({
+      customer_name: viewingOrder.customer_name || "",
+      customer_phone: viewingOrder.customer_phone || "",
+      customer_email: viewingOrder.customer_email || "",
+      shipping_address: addressStr || "",
+      order_note: viewingOrder.order_note || ""
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!viewingOrder) return;
+    
+    setIsSubmittingEdit(true);
+    try {
+      let parsedAddress = editFormData.shipping_address;
+      try {
+        parsedAddress = JSON.parse(editFormData.shipping_address);
+      } catch (err) {
+        // Ignored, fallback to string
+      }
+
+      const res = await fetch(`/admin/seller-orders/${viewingOrder.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customer_name: editFormData.customer_name,
+          customer_phone: editFormData.customer_phone,
+          customer_email: editFormData.customer_email,
+          shipping_address: parsedAddress,
+          order_note: editFormData.order_note
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setViewingOrder(data.order || { ...viewingOrder, ...editFormData, shipping_address: parsedAddress });
+        setIsEditDialogOpen(false);
+        fetchData(currentPage); 
+      } else {
+        const errorData = await res.json();
+        alert(`Lỗi cập nhật: ${errorData.message}`);
+      }
+    } catch (error) {
+      alert("Đã xảy ra lỗi khi kết nối tới Server.");
+      console.error(error);
+    } finally {
+      setIsSubmittingEdit(false);
+    }
+  };
+
+  const renderProductColumn = (order: any) => {
+      const itemsArray = order.items || [];
       if (itemsArray.length > 0) {
         return (
           <div className="flex flex-col gap-1.5 py-1">
@@ -272,32 +336,17 @@ export default function SellersAdminPage() {
           </div>
         );
       }
-
-      // Fallback nếu không có item nào (đơn hàng cũ)
       return <span className="text-sm">{order.product_type || '---'}</span>;
     };
 
   const downloadCSV = (data: any[]) => {
     if (data.length === 0) return;
     
-    // Khai báo chính xác các Headers theo yêu cầu
     const headers = [
-      "Ngày lên đơn", 
-      "ID đơn", 
-      "Tên Shop", 
-      "Tên khách", 
-      "Address Line 1", 
-      "Address Line 2", 
-      "State/Region", 
-      "Country", 
-      "Zipcode", 
-      "Loại sản phẩm", 
-      "Màu sản phẩm", 
-      "Size sản phẩm", 
-      "Link Design Front", 
-      "Link Design Back", 
-      "Link Mock-up", 
-      "Ghi chú"
+      "Ngày lên đơn", "ID đơn", "Tên Shop", "Tên khách", "Address Line 1", 
+      "Address Line 2", "State/Region", "Country", "Zipcode", "Loại sản phẩm", 
+      "Màu sản phẩm", "Size sản phẩm", "Link Design Front", "Link Design Back", 
+      "Link Mock-up", "Ghi chú"
     ];
 
     const escapeCSV = (str: any) => {
@@ -306,23 +355,17 @@ export default function SellersAdminPage() {
       return `"${stringified.replace(/"/g, '""')}"`;
     };
 
-
     const csvRows: string[] = [];
     
-    // Xử lý từng đơn hàng
     data.forEach(order => {
-      // 1. Parse Địa chỉ khách hàng
       let addr: any = {};
       try {
-        addr = typeof order.shipping_address === 'string' 
-          ? JSON.parse(order.shipping_address) 
-          : (order.shipping_address || {});
+        addr = typeof order.shipping_address === 'string' ? JSON.parse(order.shipping_address) : (order.shipping_address || {});
         if (addr.raw && typeof addr.raw === 'object') addr = addr.raw;
       } catch (e) {
         addr = { line_1: order.shipping_address };
       }
 
-      // 2. Parse Danh sách sản phẩm (Items)
       let items: any[] = [];
       try {
         if (Array.isArray(order.items) && order.items.length > 0) {
@@ -335,52 +378,34 @@ export default function SellersAdminPage() {
         }
       } catch (e) { }
 
-      // Fallback nếu không có item chi tiết nào
       if (items.length === 0) {
         items = [{
-          type: order.product_type || "",
-          color: "",
-          size: "",
-          design_front: order.design_front_url || "",
-          design_back: order.design_back_url || "",
-          mockup: ""
+          type: order.product_type || "", color: "", size: "", design_front: order.design_front_url || "", design_back: order.design_back_url || "", mockup: ""
         }];
       }
 
-      // 3. Gộp các link Mockup (từ Item và Order level)
       let orderMockups = "";
       try {
         const mu = typeof order.mockup_urls === 'string' ? JSON.parse(order.mockup_urls) : order.mockup_urls;
         if (mu && typeof mu === 'object') {
-          orderMockups = Object.values(mu).join(" | "); // Ghép nhiều link bằng dấu "|"
+          orderMockups = Object.values(mu).join(" | "); 
         }
       } catch (e) {}
 
-      // 4. Tạo Row CSV: Lặp qua từng item để tạo dòng (1 Item = 1 Row)
       items.forEach(item => {
-        // Gộp mockup của riêng item đó và mockup chung của đơn
         const itemMockup = item.mockup ? item.mockup : "";
         const finalMockups = [itemMockup, orderMockups].filter(Boolean).join(" | ");
 
         const row = [
-          escapeCSV(new Date(order.order_date).toLocaleDateString()), // Ngày lên đơn
-          escapeCSV(order.external_order_id),                         // ID đơn
-          escapeCSV(order.shop?.name || order.shop_id),               // Tên Shop
-          escapeCSV(order.customer_name),                             // Tên khách
-          escapeCSV(addr.line_1 || addr.address_1 || ""),             // Address Line 1
-          escapeCSV(addr.line_2 || addr.address_2 || ""),             // Address Line 2
-          escapeCSV(addr.region || addr.province || addr.state || ""),// State
-          escapeCSV(addr.country || addr.country_code || ""),         // Country
-          escapeCSV(addr.zip || addr.postal_code || ""),              // Zipcode
-          escapeCSV(item.type || order.product_type),                 // Loại sản phẩm
-          escapeCSV(item.color || ""),                                // Màu sản phẩm
-          escapeCSV(item.size || ""),                                 // Size sản phẩm
-          escapeCSV(item.design_front || order.design_front_url || ""), // Link design front
-          escapeCSV(item.design_back || order.design_back_url || ""),   // Link design back
-          escapeCSV(finalMockups),                                    // Link mock-up (cách nhau bởi dấu |)
-          escapeCSV(order.order_note || "")                           // Ghi chú
+          escapeCSV(new Date(order.order_date).toLocaleDateString()), escapeCSV(order.external_order_id),                         
+          escapeCSV(order.shop?.name || order.shop_id), escapeCSV(order.customer_name),                             
+          escapeCSV(addr.line_1 || addr.address_1 || ""), escapeCSV(addr.line_2 || addr.address_2 || ""),             
+          escapeCSV(addr.region || addr.province || addr.state || ""), escapeCSV(addr.country || addr.country_code || ""),         
+          escapeCSV(addr.zip || addr.postal_code || ""), escapeCSV(item.type || order.product_type),                 
+          escapeCSV(item.color || ""), escapeCSV(item.size || ""),                                 
+          escapeCSV(item.design_front || order.design_front_url || ""), escapeCSV(item.design_back || order.design_back_url || ""),   
+          escapeCSV(finalMockups), escapeCSV(order.order_note || "")                           
         ];
-
         csvRows.push(row.join(","));
       });
     });
@@ -395,7 +420,6 @@ export default function SellersAdminPage() {
     setTimeout(() => URL.revokeObjectURL(url), 100);
   };
 
-  // 2. Logic gọi API lấy dữ liệu Export
   const handleExport = async (mode: 'selected' | 'filtered') => {
     setIsLoading(true);
     try {
@@ -414,7 +438,6 @@ export default function SellersAdminPage() {
         if (searchQuery) queryParams.append("search", searchQuery);
         if (startDate) queryParams.append("startDate", startDate);
         if (endDate) queryParams.append("endDate", endDate);
-        // Bắt buộc đẩy Status của Tab hiện tại lên để xuất đúng trên bảng
         if (activeTab !== 'all') queryParams.append("status", activeTab); 
       }
 
@@ -427,7 +450,6 @@ export default function SellersAdminPage() {
     }
   };
 
-  // === CÁC HÀM XỬ LÝ UPLOAD TRACKING ===
   const handleTrackingUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -436,18 +458,17 @@ export default function SellersAdminPage() {
     Papa.parse(file, {
       header: true, skipEmptyLines: true,
       complete: (results) => {
-        // Hỗ trợ Admin xưởng dùng nhiều tên cột khác nhau
         const mappedData = results.data.map((row: any) => ({
           external_order_id: row['Order ID'] || row['Mã Đơn'] || row['external_order_id'],
           tracking_number: row['Tracking Number'] || row['Tracking'] || row['Mã Vận Đơn'] || row['tracking_number'],
           carrier: row['Carrier'] || row['Hãng VC'] || row['shipping_carrier'] || 'USPS'
-        })).filter(r => r.external_order_id && r.tracking_number); // Chỉ lấy dòng hợp lệ
+        })).filter(r => r.external_order_id && r.tracking_number); 
         
         setTrackingData(mappedData);
         setTrackingMessage(`Đã đọc xong! Có ${mappedData.length} mã vận đơn sẵn sàng đồng bộ.`);
       }
     });
-    event.target.value = ''; // Reset input
+    event.target.value = ''; 
   };
 
   const handleSyncTracking = async () => {
@@ -464,12 +485,11 @@ export default function SellersAdminPage() {
       const data = await response.json();
       
       setTrackingMessage(data.message || "Đồng bộ thành công!");
-      // Reset và tắt popup sau 2 giây
       setTimeout(() => {
         setIsTrackingModalOpen(false);
         setTrackingData([]);
         setTrackingMessage('');
-        fetchData(currentPage); // Refresh bảng
+        fetchData(currentPage); 
       }, 2000);
       
     } catch (error: any) {
@@ -486,6 +506,7 @@ export default function SellersAdminPage() {
   if (isLoading && ordersList.length === 0 && sellers.length === 0) {
     return <div className="p-8 text-gray-500">Đang tải dữ liệu hệ thống...</div>
   }
+  
   return (
     <div className="flex flex-col gap-y-6 relative">
       <div className="flex flex-col gap-y-2 lg:flex-row lg:justify-between lg:items-center">
@@ -494,7 +515,6 @@ export default function SellersAdminPage() {
           <p className="text-gray-500">Quản lý đối tác và phê duyệt đơn hàng trước khi sản xuất.</p>
         </div>
         
-        {/* NÚT MỞ POPUP IMPORT TRACKING */}
         <Button 
           variant="secondary" 
           className="bg-gray-900 text-white hover:bg-gray-800 shadow-md h-10 px-4"
@@ -512,7 +532,7 @@ export default function SellersAdminPage() {
             value={selectedSellerId} 
             onChange={(e) => {
               setSelectedSellerId(e.target.value); 
-              setSelectedShopId(''); // Tự động reset Shop khi đổi Seller
+              setSelectedShopId(''); 
               setCurrentPage(1);
             }}
             className="border p-2 rounded text-sm min-w-[150px] outline-none focus:border-blue-500"
@@ -529,7 +549,7 @@ export default function SellersAdminPage() {
           <select 
             value={selectedShopId} 
             onChange={(e) => {setSelectedShopId(e.target.value); setCurrentPage(1);}}
-            disabled={!selectedSellerId && displayedShops.length === 0} // Vô hiệu hóa nếu không có data
+            disabled={!selectedSellerId && displayedShops.length === 0}
             className="border p-2 rounded text-sm min-w-[150px] outline-none focus:border-blue-500 disabled:bg-gray-100"
           >
             <option value="">Tất cả Shop {selectedSellerId ? 'của Seller này' : ''}</option>
@@ -576,23 +596,20 @@ export default function SellersAdminPage() {
         >
           Làm mới
         </button>
-        {/* Nút Xuất CSV theo Filter hiện tại */}
-            <Button variant="secondary" onClick={() => handleExport('filtered')}>
-                <ArrowDownTray /> Xuất CSV (Kết quả lọc)
-            </Button>
+        <Button variant="secondary" onClick={() => handleExport('filtered')}>
+            <ArrowDownTray /> Xuất CSV (Kết quả lọc)
+        </Button>
       </div>
+
       {/* THANH BULK ACTION */}
       {(selectedIds.length > 0 || isSelectAllPages) && (
         <div className={clx("bg-gray-900 text-white p-4 rounded-lg flex items-center justify-between shadow-lg sticky top-4 transition-all", isReshipModalOpen || isTrackingModalOpen || viewingOrder ? "z-0" : "z-30")}>
           <div className="flex items-center gap-x-4">
             <span className="font-bold bg-blue-500 px-2 py-1 rounded text-xs">
-              {/* NẾU CHỌN TẤT CẢ THÌ HIỂN THỊ TỔNG SỐ ĐƠN (TOTAL COUNT) */}
               {isSelectAllPages ? totalCount : selectedIds.length} đơn đã chọn
             </span>
           </div>
           <div className="flex gap-x-2 items-center">
-            
-            {/* THÊM NÚT PUSH STATUS THEO TỪNG TAB */}
             {activeTab === 'processing' && (
               <Button variant="secondary" size="small" className="bg-orange-600 border-none text-white hover:bg-orange-700" 
                 onClick={() => handlePushStatus('in_transit')} isLoading={isBulking}>
@@ -620,7 +637,6 @@ export default function SellersAdminPage() {
               </>
             )}
             
-            {/* CÁC NÚT RESHIP ĐƯỢC THÊM VÀO TAB SUPPORT */}
             {activeTab === 'support' && (
               <>
                 <Button variant="secondary" size="small" className="bg-green-600 border-none text-white hover:bg-green-700" 
@@ -648,7 +664,6 @@ export default function SellersAdminPage() {
               </Button>
             )}
 
-            {/* Các nút luôn hiện cho đơn đã chọn */}
             <Button variant="secondary" size="small" className="bg-red-600 border-none text-white hover:bg-red-700"
               onClick={() => handleBulkAction('delete')} isLoading={isBulking}>
               <Trash /> Xóa vĩnh viễn
@@ -667,7 +682,7 @@ export default function SellersAdminPage() {
       )}
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        {/* CỘT 1: QUẢN LÝ SELLER (1/3 màn hình) */}
+        {/* CỘT 1: QUẢN LÝ SELLER */}
         <div className="xl:col-span-1 flex flex-col gap-y-4">
           <h2 className="font-semibold text-gray-800 uppercase text-sm tracking-wider">Danh sách Seller - Newest</h2>
           {sellers.map(seller => {
@@ -684,15 +699,12 @@ export default function SellersAdminPage() {
                   </span>
                 </div>
                 
-                {/* Khu vực cấu hình Phí kinh doanh */}
                 <div className="flex flex-col gap-2 mb-4 text-xs bg-gray-50 p-2 rounded border border-gray-100">
-                  {/* Phí 1: Markup (Cộng trên mỗi sản phẩm) */}
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600">Phí in thêm (Markup): <strong className="text-green-600">+${seller.markup_fee || 0}</strong></span>
                     <button onClick={() => handleUpdateMarkup(seller.id, seller.markup_fee || 0)} className="text-blue-600 font-semibold hover:underline">Sửa phí</button>
                   </div>
                   
-                  {/* Phí 2: Per Order Fee (Cộng 1 lần cho 1 ID đơn) */}
                   <div className="flex justify-between items-center border-t border-gray-200 pt-2">
                     <span className="text-gray-600">Phí xử lý đơn (Per Order): <strong className="text-orange-600">+${seller.per_order_fee || 0}/đơn</strong></span>
                     <button onClick={() => handleUpdatePerOrderFee(seller.id, seller.per_order_fee || 0)} className="text-blue-600 font-semibold hover:underline">Sửa phí</button>
@@ -711,7 +723,6 @@ export default function SellersAdminPage() {
                           </span>
                         </div>
                         
-                        {/* Thanh công cụ quản lý Shop */}
                         <div className="flex justify-end gap-3 text-xs border-t border-gray-100 pt-2">
                           <button 
                             onClick={() => handleAdminToggleShop(shop)} 
@@ -738,64 +749,41 @@ export default function SellersAdminPage() {
           {sellers.length === 0 && <div className="text-sm text-gray-500">Chưa có Seller nào trong hệ thống.</div>}
         </div>
 
-        {/* CỘT 2: TRUNG TÂM DUYỆT ĐƠN HÀNG (2/3 màn hình) */}
+        {/* CỘT 2: BẢNG DANH SÁCH ĐƠN HÀNG */}
         <div className="xl:col-span-2 flex flex-col gap-y-4">
           
-          {/* HỆ THỐNG TABS MỚI */}
           <div className="flex items-center justify-between">
             <div className="flex gap-2 flex-wrap">
               <button onClick={() => {
-                setActiveTab('complete'); 
-                setCurrentPage(1); 
-                setSelectedIds([]); 
-                setIsSelectAllPages(false);
+                setActiveTab('complete'); setCurrentPage(1); setSelectedIds([]); setIsSelectAllPages(false);
               }} className={clx("px-4 py-2 rounded-lg text-sm font-semibold transition", activeTab === 'complete' ? "bg-gray-900 text-white" : "bg-white border text-gray-600 hover:bg-gray-50")}>
                 Đơn chờ duyệt
               </button>
               <button onClick={() => {
-                setActiveTab('processing'); 
-                setCurrentPage(1); 
-                setSelectedIds([]); 
-                setIsSelectAllPages(false);
+                setActiveTab('processing'); setCurrentPage(1); setSelectedIds([]); setIsSelectAllPages(false);
               }} className={clx("px-4 py-2 rounded-lg text-sm font-semibold transition", activeTab === 'processing' ? "bg-blue-100 text-blue-800" : "bg-white border text-gray-600 hover:bg-gray-50")}>
                 Đang sản xuất
               </button>
               <button onClick={() => {
-                setActiveTab('in_transit'); 
-                setCurrentPage(1); 
-                setSelectedIds([]); 
-                setIsSelectAllPages(false);
+                setActiveTab('in_transit'); setCurrentPage(1); setSelectedIds([]); setIsSelectAllPages(false);
               }} className={clx("px-4 py-2 rounded-lg text-sm font-semibold transition", activeTab === 'in_transit' ? "bg-orange-100 text-orange-800" : "bg-white border text-gray-600 hover:bg-gray-50")}>
                 Đang giao hàng
               </button>
               <button onClick={() => {
-                setActiveTab('done'); 
-                setCurrentPage(1); 
-                setSelectedIds([]); 
-                setIsSelectAllPages(false);
+                setActiveTab('done'); setCurrentPage(1); setSelectedIds([]); setIsSelectAllPages(false);
               }} className={clx("px-4 py-2 rounded-lg text-sm font-semibold transition", activeTab === 'done' ? "bg-green-100 text-green-800" : "bg-white border text-gray-600 hover:bg-gray-50")}>
                 Hoàn thành
               </button>
-              
-              {/* TAB KHIẾU NẠI ĐƯỢC CHỈNH SỬA NỔI BẬT HƠN */}
               <button onClick={() => {
-                setActiveTab('support'); 
-                setCurrentPage(1); 
-                setSelectedIds([]); 
-                setIsSelectAllPages(false);
+                setActiveTab('support'); setCurrentPage(1); setSelectedIds([]); setIsSelectAllPages(false);
               }} className={clx("px-4 py-2 text-xs font-bold rounded-lg border", activeTab === 'support' ? "bg-red-600 border-red-600 text-white shadow-md" : "bg-white border-red-200 text-red-600 hover:bg-red-50")}>
                 Yêu cầu Hỗ trợ
               </button>
-              
               <button onClick={() => {
-                setActiveTab('reship'); 
-                setCurrentPage(1); 
-                setSelectedIds([]); 
-                setIsSelectAllPages(false);
+                setActiveTab('reship'); setCurrentPage(1); setSelectedIds([]); setIsSelectAllPages(false);
               }} className={clx("px-4 py-2 text-xs font-bold rounded-lg border", activeTab === 'reship' ? "bg-purple-600 border-purple-600 text-white shadow-md" : "bg-white border-purple-200 text-purple-600 hover:bg-purple-50")}>
                 Đơn Reship (RS)
               </button>
-              
               <button onClick={() => {setActiveTab('all'); setCurrentPage(1)}} className={clx("px-4 py-2 rounded-lg text-sm font-semibold transition", activeTab === 'all' ? "bg-gray-200 text-gray-900" : "bg-white border text-gray-600 hover:bg-gray-50")}>
                 Tất cả đơn
               </button>
@@ -804,6 +792,7 @@ export default function SellersAdminPage() {
               {totalCount} Đơn hàng
             </span>
           </div>
+
           {selectedIds.length === ordersList.length && ordersList.length > 0 && !isSelectAllPages && totalCount > ordersList.length && (
             <div className="mb-4 p-3 bg-blue-50 border border-blue-200 text-blue-800 rounded-lg flex items-center justify-between text-sm">
               <span>Bạn đã chọn tất cả <b>{ordersList.length}</b> đơn hàng trên trang này.</span>
@@ -827,6 +816,7 @@ export default function SellersAdminPage() {
               </button>
             </div>
           )}
+
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-x-auto">
             <table className="w-full text-left text-sm whitespace-nowrap">
               <thead className="bg-gray-50 border-b border-gray-200 text-gray-500">
@@ -909,7 +899,7 @@ export default function SellersAdminPage() {
               </tbody>
             </table>
           </div>
-          {/* ... Pagination ... */}
+
           {totalPages > 1 && (
             <div className="flex items-center justify-between px-4 py-4 bg-white border border-gray-200 rounded-lg shadow-sm">
               <div className="text-sm text-gray-500 font-medium">
@@ -926,7 +916,7 @@ export default function SellersAdminPage() {
       </div>
 
       {/* ================================================= */}
-      {/* 🛠️ POPUP DUYỆT ĐI LẠI ĐƠN (RESHIP) CHỈ DÀNH CHO TAB SUPPORT */}
+      {/* POPUP DUYỆT ĐI LẠI ĐƠN (RESHIP) CHỈ DÀNH CHO TAB SUPPORT */}
       {/* ================================================= */}
       {isReshipModalOpen && (
         <FocusModal open={isReshipModalOpen} onOpenChange={setIsReshipModalOpen}>
@@ -979,7 +969,7 @@ export default function SellersAdminPage() {
       )}
 
       {/* ================================================= */}
-      {/* 📥 POPUP (MODAL) IMPORT TRACKING CSV BẰNG MEDUSA UI */}
+      {/* POPUP IMPORT TRACKING CSV BẰNG MEDUSA UI */}
       {/* ================================================= */}
       {isTrackingModalOpen && (
         <FocusModal open={isTrackingModalOpen} onOpenChange={setIsTrackingModalOpen}>
@@ -992,7 +982,6 @@ export default function SellersAdminPage() {
             <FocusModal.Body className="p-8 bg-gray-50 flex flex-col items-center">
               
               <div className="w-full max-w-4xl bg-white p-8 rounded-xl shadow-sm border border-gray-200 flex flex-col gap-y-6">
-                {/* 1. KHU VỰC KÉO THẢ / CHỌN FILE */}
                 <div className="border-2 border-dashed border-blue-300 bg-blue-50 rounded-xl p-10 flex flex-col items-center justify-center text-center">
                   <ArrowUpTray className="text-blue-500 w-10 h-10 mb-4" />
                   <Heading level="h2" className="text-gray-800 mb-2">Tải lên file Tracking (CSV)</Heading>
@@ -1006,14 +995,12 @@ export default function SellersAdminPage() {
                   </label>
                 </div>
 
-                {/* 2. THÔNG BÁO STATUS */}
                 {trackingMessage && (
                   <div className={clx("p-4 rounded-lg text-sm font-semibold border", trackingMessage.includes("Lỗi") ? "bg-red-50 text-red-600 border-red-200" : "bg-green-50 text-green-700 border-green-200")}>
                     {trackingMessage}
                   </div>
                 )}
 
-                {/* 3. BẢNG PREVIEW DỮ LIỆU SẼ IMPORT */}
                 {trackingData.length > 0 && (
                   <div className="flex flex-col gap-y-4">
                     <div className="flex justify-between items-center">
@@ -1058,23 +1045,30 @@ export default function SellersAdminPage() {
       )}
 
       {/* ================================================= */}
-      {/* MODAL CHI TIẾT ĐƠN HÀNG */}
+      {/* MODAL CHI TIẾT ĐƠN HÀNG (KÈM NÚT SỬA) */}
       {/* ================================================= */}
       {viewingOrder && (
         <FocusModal open={!!viewingOrder} onOpenChange={(open) => !open && setViewingOrder(null)}>
           <FocusModal.Content>
             <FocusModal.Header>
-              <div className="flex items-center gap-x-4">
-                <Heading>Chi tiết đơn hàng: {viewingOrder.external_order_id}</Heading>
-                <Badge color={viewingOrder.status === 'pending' ? 'orange' : viewingOrder.status === 'processing' ? 'blue' : viewingOrder.status === 'cancelled' ? 'red' : 'green'}>
-                  {viewingOrder.status}
-                </Badge>
+              <div className="flex justify-between items-center w-full pr-4">
+                <div className="flex items-center gap-x-4">
+                  <Heading>Chi tiết đơn hàng: {viewingOrder.external_order_id}</Heading>
+                  <Badge color={viewingOrder.status === 'pending' ? 'orange' : viewingOrder.status === 'processing' ? 'blue' : viewingOrder.status === 'cancelled' ? 'red' : 'green'}>
+                    {viewingOrder.status}
+                  </Badge>
+                </div>
+                {/* Chỉ cho sửa khi đơn đang chờ duyệt (pending) hoặc chờ in (processing), complete là paid theo code cũ */}
+                {['pending', 'processing', 'complete'].includes(viewingOrder.status) && (
+                  <Button variant="secondary" className="bg-gray-900 text-white hover:bg-gray-800" onClick={handleOpenEditDrawer}>
+                    Chỉnh sửa đơn hàng
+                  </Button>
+                )}
               </div>
             </FocusModal.Header>
             <FocusModal.Body className="p-8 bg-gray-50 overflow-y-auto max-h-[calc(100vh-120px)]">
               <div className="grid grid-cols-2 gap-6 max-w-5xl mx-auto">
                 
-                {/* 1. THÔNG TIN KHÁCH HÀNG (Cột trái) */}
                 <Container className="p-6 bg-white shadow-sm border border-gray-100">
                   <Heading level="h2" className="mb-4 text-gray-400 text-xs uppercase tracking-widest border-b pb-2">Thông tin khách hàng</Heading>
                   <div className="space-y-3">
@@ -1084,7 +1078,6 @@ export default function SellersAdminPage() {
                   </div>
                 </Container>
                 
-                {/* 2. THÔNG TIN ĐƠN & SHOP (Cột phải) */}
                 <Container className="p-6 bg-white shadow-sm border border-gray-100">
                   <Heading level="h2" className="mb-4 text-gray-400 text-xs uppercase tracking-widest border-b pb-2">Thông tin Đơn & Shop</Heading>
                   <div className="space-y-3">
@@ -1095,7 +1088,6 @@ export default function SellersAdminPage() {
                   </div>
                 </Container>
 
-                {/* 3. DANH SÁCH SẢN PHẨM CHI TIẾT (Rộng 2 cột) */}
                 <Container className="p-6 col-span-2 bg-white shadow-sm border border-gray-100">
                   <Heading level="h2" className="mb-4 text-gray-400 text-xs uppercase tracking-widest border-b pb-2">Danh sách sản phẩm chi tiết</Heading>
                   <div className="grid grid-cols-1 gap-3">
@@ -1128,7 +1120,6 @@ export default function SellersAdminPage() {
                   </div>
                 </Container>
 
-                {/* 4. ĐỊA CHỈ GIAO HÀNG (Rộng 2 cột) */}
                 <Container className="p-6 col-span-2 bg-white shadow-sm border border-gray-100">
                   <Heading level="h2" className="mb-4 text-gray-400 text-xs uppercase tracking-widest border-b pb-2">Địa chỉ giao hàng</Heading>
                   <div className="bg-gray-50 p-4 rounded-lg text-sm border border-gray-100">
@@ -1140,7 +1131,6 @@ export default function SellersAdminPage() {
                   </div>
                 </Container>
                 
-                {/* 5. GHI CHÚ VÀ HỖ TRỢ KHIẾU NẠI (Nếu có) */}
                 {viewingOrder.order_note && (
                   <Container className="p-6 col-span-2 bg-white shadow-sm border border-gray-100">
                     <Heading level="h2" className="mb-4 text-gray-400 text-xs uppercase tracking-widest border-b pb-2">
@@ -1149,7 +1139,6 @@ export default function SellersAdminPage() {
                     
                     {(() => {
                       const noteStr = viewingOrder.order_note;
-                      // Bóc tách tự động nếu là đơn support
                       if (noteStr.includes("Minh chứng:")) {
                         const parts = noteStr.split("Minh chứng:");
                         const reason = parts[0].trim();
@@ -1174,7 +1163,6 @@ export default function SellersAdminPage() {
                         );
                       }
 
-                      // Render ghi chú bình thường nếu không phải đơn support
                       return (
                         <Text className="text-sm text-gray-700 italic bg-yellow-50 p-3 rounded border border-yellow-100">
                           {noteStr}
@@ -1188,6 +1176,78 @@ export default function SellersAdminPage() {
           </FocusModal.Content>
         </FocusModal>
       )}
+
+      {/* ================================================= */}
+      {/* ✏️ DRAWER CHỈNH SỬA ĐƠN HÀNG LỚP Z-INDEX CAO NHẤT */}
+      {/* ================================================= */}
+      {isEditDialogOpen && viewingOrder && (
+        <Drawer open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <Drawer.Content className="z-[9999] border-l border-gray-200 shadow-2xl">
+            <Drawer.Header>
+              <Drawer.Title>Chỉnh sửa ID: {viewingOrder.external_order_id}</Drawer.Title>
+            </Drawer.Header>
+            <Drawer.Body className="p-6 overflow-y-auto">
+              <form id="edit-order-form" onSubmit={handleEditSubmit} className="space-y-5">
+                
+                <div className="flex flex-col gap-y-2">
+                  <Label className="text-gray-700 font-semibold">Tên khách hàng (*)</Label>
+                  <Input 
+                    value={editFormData.customer_name}
+                    onChange={e => setEditFormData({...editFormData, customer_name: e.target.value})}
+                    required
+                  />
+                </div>
+
+                <div className="flex flex-col gap-y-2">
+                  <Label className="text-gray-700 font-semibold">Số điện thoại</Label>
+                  <Input 
+                    value={editFormData.customer_phone}
+                    onChange={e => setEditFormData({...editFormData, customer_phone: e.target.value})}
+                  />
+                </div>
+
+                <div className="flex flex-col gap-y-2">
+                  <Label className="text-gray-700 font-semibold">Email</Label>
+                  <Input 
+                    type="email"
+                    value={editFormData.customer_email}
+                    onChange={e => setEditFormData({...editFormData, customer_email: e.target.value})}
+                  />
+                </div>
+
+                <div className="flex flex-col gap-y-2">
+                  <Label className="text-gray-700 font-semibold">Địa chỉ giao hàng (Raw/JSON)</Label>
+                  <textarea 
+                    className="w-full p-3 border border-gray-200 rounded-lg text-sm outline-none focus:border-blue-500 min-h-[200px] font-mono text-gray-700 bg-gray-50"
+                    value={editFormData.shipping_address}
+                    onChange={e => setEditFormData({...editFormData, shipping_address: e.target.value})}
+                  />
+                  <span className="text-[10px] text-gray-400">Có thể nhập chuỗi chữ hoặc định dạng JSON.</span>
+                </div>
+
+                <div className="flex flex-col gap-y-2">
+                  <Label className="text-gray-700 font-semibold">Ghi chú (Note)</Label>
+                  <textarea 
+                    className="w-full p-3 border border-gray-200 rounded-lg text-sm outline-none focus:border-blue-500 min-h-[100px]"
+                    value={editFormData.order_note}
+                    onChange={e => setEditFormData({...editFormData, order_note: e.target.value})}
+                  />
+                </div>
+
+              </form>
+            </Drawer.Body>
+            <Drawer.Footer className="border-t border-gray-100 p-4 bg-gray-50">
+              <Drawer.Close asChild>
+                <Button variant="secondary">Hủy bỏ</Button>
+              </Drawer.Close>
+              <Button form="edit-order-form" type="submit" variant="secondary" className="bg-blue-600 text-white hover:bg-blue-700" isLoading={isSubmittingEdit}>
+                Lưu thay đổi
+              </Button>
+            </Drawer.Footer>
+          </Drawer.Content>
+        </Drawer>
+      )}
+
     </div>
   )
 }
