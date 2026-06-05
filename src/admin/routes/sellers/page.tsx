@@ -359,9 +359,10 @@ export default function SellersAdminPage() {
   const downloadCSV = (data: any[]) => {
     if (data.length === 0) return;
     
+    // 1. Thêm "City" vào danh sách Headers (sau Address Line 2)
     const headers = [
       "Ngày lên đơn", "ID đơn", "Tên Shop", "Tên khách", "Address Line 1", 
-      "Address Line 2", "State/Region", "Country", "Zipcode", "Loại sản phẩm", 
+      "Address Line 2", "City", "State/Region", "Country", "Zipcode", "Loại sản phẩm", 
       "Màu sản phẩm", "Size sản phẩm", "Link Design Front", "Link Design Back", 
       "Link Mock-up", "Ghi chú"
     ];
@@ -413,13 +414,15 @@ export default function SellersAdminPage() {
         const itemMockup = item.mockup ? item.mockup : "";
         const finalMockups = [itemMockup, orderMockups].filter(Boolean).join(" | ");
 
+        // 2. Thêm escapeCSV(addr.city || "") vào đúng vị trí tương ứng
         const row = [
           escapeCSV(new Date(order.order_date).toLocaleDateString()), escapeCSV(order.external_order_id),                         
-          escapeCSV(order.shop?.name || order.shop_id), escapeCSV(order.customer_name),                             
-          escapeCSV(addr.line_1 || addr.address_1 || ""), escapeCSV(addr.line_2 || addr.address_2 || ""),             
-          escapeCSV(addr.region || addr.province || addr.state || ""), escapeCSV(addr.country || addr.country_code || ""),         
-          escapeCSV(addr.zip || addr.postal_code || ""), escapeCSV(item.type || order.product_type),                 
-          escapeCSV(item.color || ""), escapeCSV(item.size || ""),                                 
+          escapeCSV(order.shop?.name || order.shop_id), escapeCSV(order.customer_name),                               
+          escapeCSV(addr.line_1 || addr.address_1 || ""), escapeCSV(addr.line_2 || addr.address_2 || ""),  
+          escapeCSV(addr.city || ""), // <--- THÊM CỘT CITY Ở ĐÂY
+          escapeCSV(addr.region || addr.province || addr.state || ""), escapeCSV(addr.country || addr.country_code || ""),          
+          escapeCSV(addr.zip || addr.postal_code || ""), escapeCSV(item.type || order.product_type),                  
+          escapeCSV(item.color || ""), escapeCSV(item.size || ""),                                  
           escapeCSV(item.design_front || order.design_front_url || ""), escapeCSV(item.design_back || order.design_back_url || ""),   
           escapeCSV(finalMockups), escapeCSV(order.order_note || "")                           
         ];
