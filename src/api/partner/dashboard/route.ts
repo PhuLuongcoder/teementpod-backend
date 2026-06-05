@@ -194,7 +194,18 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
     });
 
     const current_debt = total_debt_generated - total_paid;
-
+    let special_discount = "0%";
+    let discount_note = "Hạng thành viên tiêu chuẩn";
+    
+    try {
+      const currentSeller = await sellerService.retrieveSeller(currentSellerId);
+      if (currentSeller) {
+        special_discount = currentSeller.special_discount || "0%";
+        discount_note = currentSeller.discount_note || "Hạng thành viên tiêu chuẩn";
+      }
+    } catch (e) {
+      console.error("Lỗi khi lấy thông tin ưu đãi Seller:", e);
+    }
     // ==========================================
     // 7. TRẢ KẾT QUẢ VỀ FRONTEND
     // ==========================================
@@ -208,7 +219,9 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
           amount: Number(total_saved_amount.toFixed(2))
         },
         current_debt: Number(current_debt.toFixed(2)),
-        total_paid: Number(total_paid.toFixed(2))      
+        total_paid: Number(total_paid.toFixed(2)),
+        special_discount: special_discount,
+        discount_note: discount_note
       },
       payment_history: paymentHistory, 
       charts: {
