@@ -130,7 +130,7 @@ export default function SellersAdminPage() {
     }
   };
   const handleUpdateDiscount = async (sellerId: string, currentDiscount: string, currentNote: string) => {
-    const valDiscount = prompt("Nhập mức ưu đãi hiển thị (VD: Giảm 5%, Freeship):", currentDiscount || "0%");
+    const valDiscount = prompt("Nhập mức ưu đãi hiển thị (VD: $5, $10, Freeship):", currentDiscount || "$0");
     if (valDiscount !== null) {
       const valNote = prompt("Nhập ghi chú hạng thẻ (VD: Seller VIP):", currentNote || "Hạng thành viên tiêu chuẩn");
       if (valNote !== null) {
