@@ -12,5 +12,10 @@ export const Seller = model.define("seller", {
   is_active: model.boolean().default(true),
   markup_fee: model.float().default(0),
   per_order_fee: model.number().default(0),
+  
+  // --- THÊM 2 TRƯỜNG MỚI ĐỂ LƯU CHIẾT KHẤU & GHI CHÚ ---
+  special_discount: model.text().default("0%"),
+  discount_note: model.text().default("Hạng thành viên tiêu chuẩn"),
+  
   shops: model.hasMany(() => Shop), 
 })
