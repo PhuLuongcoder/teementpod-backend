@@ -129,7 +129,23 @@ export default function SellersAdminPage() {
       fetchData(currentPage);
     }
   };
-
+  const handleUpdateDiscount = async (sellerId: string, currentDiscount: string, currentNote: string) => {
+    const valDiscount = prompt("Nhập mức ưu đãi hiển thị (VD: Giảm 5%, Freeship):", currentDiscount || "0%");
+    if (valDiscount !== null) {
+      const valNote = prompt("Nhập ghi chú hạng thẻ (VD: Seller VIP):", currentNote || "Hạng thành viên tiêu chuẩn");
+      if (valNote !== null) {
+        await fetch(`/admin/sellers/${sellerId}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ 
+            special_discount: valDiscount,
+            discount_note: valNote
+          })
+        });
+        fetchData(currentPage);
+      }
+    }
+  };
   useEffect(() => {
     fetchData(currentPage)
   }, [fetchData, currentPage])
@@ -709,6 +725,13 @@ export default function SellersAdminPage() {
                   <div className="flex justify-between items-center border-t border-gray-200 pt-2">
                     <span className="text-gray-600">Phí xử lý đơn (Per Order): <strong className="text-orange-600">+${seller.per_order_fee || 0}/đơn</strong></span>
                     <button onClick={() => handleUpdatePerOrderFee(seller.id, seller.per_order_fee || 0)} className="text-blue-600 font-semibold hover:underline">Sửa phí</button>
+                  </div>
+                  <div className="flex justify-between items-center border-t border-gray-200 pt-2">
+                    <span className="text-gray-600 flex flex-col">
+                      <span>Ưu đãi (Hiển thị): <strong className="text-purple-600">{seller.special_discount || "0%"}</strong></span>
+                      <span className="text-[10px] text-gray-400 italic">({seller.discount_note || "Hạng thành viên tiêu chuẩn"})</span>
+                    </span>
+                    <button onClick={() => handleUpdateDiscount(seller.id, seller.special_discount, seller.discount_note)} className="text-blue-600 font-semibold hover:underline">Sửa ưu đãi</button>
                   </div>
                 </div>
                 
