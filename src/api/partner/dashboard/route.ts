@@ -77,12 +77,15 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
     let total_saved_amount = 0;
     
     const total_revenue = orders.reduce((sum: number, order: any) => {
+      // Công thức: Giá hiển thị Seller = Giá DB - Phí xử lý đơn
+      const displayPrice = Math.max(0, Number(order.order_price || 0) - perOrderFee);
+
       if (order.status === 'support') {
         total_supported_orders++;
-        total_saved_amount += Number(order.order_price || 0);
+        total_saved_amount += displayPrice; // Trừ luôn ở khối support
       }
       if (paidStatuses.includes(order.status)) {
-        return sum + Number(order.order_price || 0);
+        return sum + displayPrice; // Trừ phí khỏi tổng doanh thu
       }
       return sum;
     }, 0);
@@ -110,7 +113,8 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
     orders.forEach((order: any) => {
       const orderDate = new Date(order.order_date);
       const isPaid = paidStatuses.includes(order.status);
-      const price = isPaid ? Number(order.order_price || 0) : 0;
+      const displayPrice = Math.max(0, Number(order.order_price || 0) - perOrderFee);
+      const price = isPaid ? displayPrice : 0;
 
       let bucketKey = '';
       
@@ -189,7 +193,8 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
     let total_debt_generated = 0;
     allTimeOrders.forEach((o: any) => {
       if (paidStatuses.includes(o.status)) {
-        total_debt_generated += Number(o.order_price || 0);
+        const displayPrice = Math.max(0, Number(o.order_price || 0) - perOrderFee);
+        total_debt_generated += displayPrice; // Công nợ Seller thấy đã được trừ phí
       }
     });
 
@@ -199,6 +204,7 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
     
     try {
       const currentSeller = await sellerService.retrieveSeller(currentSellerId);
+      const perOrderFee = currentSeller?.per_order_fee || 0;
       if (currentSeller) {
         special_discount = currentSeller.special_discount || "$0";
         discount_note = currentSeller.discount_note || "Hạng thành viên tiêu chuẩn";
