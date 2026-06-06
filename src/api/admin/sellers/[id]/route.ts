@@ -4,20 +4,21 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
   try {
     const { id } = req.params;
     
-    // 1. Nhận các thông số từ Frontend gửi xuống (Đã thêm 2 trường Ưu đãi)
+    // 1. Nhận các thông số từ Frontend gửi xuống
     const { markup_fee, per_order_fee, special_discount, discount_note } = req.body as any;
     const sellerService = req.scope.resolve("sellerModuleService") as any;
     
     // 2. Tạo một Object Payload linh hoạt
-    // Chỉ cập nhật những trường nào được Admin gửi lên, giữ nguyên các trường khác
     const updatePayload: any = { id };
     
     if (markup_fee !== undefined) {
-      updatePayload.markup_fee = Number(markup_fee);
+      // Dùng parseFloat để giữ nguyên phần thập phân
+      updatePayload.markup_fee = parseFloat(markup_fee);
     }
     
     if (per_order_fee !== undefined) {
-      updatePayload.per_order_fee = Number(per_order_fee);
+      // Dùng parseFloat để giữ nguyên phần thập phân
+      updatePayload.per_order_fee = parseFloat(per_order_fee);
     }
 
     // --- CẬP NHẬT TRƯỜNG ƯU ĐÃI ---
