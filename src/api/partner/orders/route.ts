@@ -77,9 +77,21 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
       { skip, take: limit, order: { created_at: "DESC" } }
     );
 
+    // =======================================================================
+    // MỚI: LẤY THÔNG TIN SELLER ĐỂ LẤY PHÍ ẨN VÀ TRỪ RA TRƯỚC KHI GỬI CHO SELLER
+    // =======================================================================
+    const sellers = await sellerService.listSellers({ id: currentSellerId });
+    const perOrderFee = sellers.length > 0 ? Number(sellers[0].per_order_fee || 0) : 0;
+
+    const modifiedOrders = orders.map((order: any) => ({
+      ...order,
+      // Trừ đi phí xử lý đơn để hiển thị giá gốc (không cho kết quả âm)
+      order_price: Math.max(0, Number(order.order_price || 0) - perOrderFee)
+    }));
+
     res.json({
       status: "success",
-      orders,
+      orders: modifiedOrders, // Trả về mảng đơn hàng đã được giấu phí
       count,
       totalPages: Math.ceil(count / limit),
       currentPage: page
@@ -192,56 +204,6 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
       };
     });
 
-
-    /*const outOfStockErrors: string[] = [];
-    const unknownProductErrors: string[] = [];
-
-    const allBlanks = await sellerService.listPodBlanks({}) as any[];
-
-    for (const order of formattedOrders) {
-      if (!order.items || order.items.length === 0) continue;
-
-      for (const item of order.items) {
-        const safeType = item.type ? item.type.trim().toLowerCase() : "";
-        const safeSku = item.sku ? item.sku.trim().toLowerCase() : "";
-        
-        const matchedBlank = allBlanks.find((b: any) => 
-          (safeSku && b.sku?.toLowerCase() === safeSku) || 
-          (safeType && b.name?.toLowerCase() === safeType)
-        );
-
-        if (matchedBlank) {
-          item.type = matchedBlank.name;
-
-          if (matchedBlank.in_stock === false) {
-            outOfStockErrors.push(`Đơn [${order.external_order_id}]: Phôi "${matchedBlank.name}" hiện đang HẾT HÀNG toàn bộ.`);
-          } 
-          else if (matchedBlank.out_of_stock_variants && Array.isArray(matchedBlank.out_of_stock_variants)) {
-            const isVariantOos = matchedBlank.out_of_stock_variants.some(
-              (v: any) => v.color?.toLowerCase() === item.color?.trim().toLowerCase() && 
-                          v.size?.toLowerCase() === item.size?.trim().toLowerCase()
-            );
-            
-            if (isVariantOos) {
-              outOfStockErrors.push(`Đơn [${order.external_order_id}]: Phôi "${matchedBlank.name}" (Màu: ${item.color}, Size: ${item.size}) hiện đang HẾT HÀNG.`);
-            }
-          }
-        } else {
-          unknownProductErrors.push(`Đơn [${order.external_order_id}]: Dữ liệu "${item.type || item.sku}" không khớp với bất kỳ SKU hay Tên phôi nào trên hệ thống.`);
-        }
-      }
-    }
-
-    if (outOfStockErrors.length > 0 || unknownProductErrors.length > 0) {
-      const allErrors = [...outOfStockErrors, ...unknownProductErrors];
-      const displayErrors = allErrors.slice(0, 10).map(err => `• ${err}`).join('\n');
-      const moreText = allErrors.length > 10 ? `\n\n... và ${allErrors.length - 10} lỗi khác.` : '';
-
-      return res.status(400).json({ 
-        error: `Tải file thất bại! Phát hiện sản phẩm không hợp lệ:\n\n${displayErrors}${moreText}\n\n-> Vui lòng sửa lại file CSV hoặc báo Admin thêm phôi.` 
-      });
-    }
-*/
     for (const orderData of formattedOrders) {
       if (!orderData.items || orderData.items.length === 0) continue;
 
@@ -343,7 +305,8 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
 
       // Gán vào đơn hàng
       orderData.shipping_cost = totalShippingCost; 
-      orderData.order_price = totalCalculatedPrice + totalShippingCost + perOrderFee; // Cộng số âm = Trừ tiền!
+      // VẪN GIỮ NGUYÊN PHÍ PER ORDER Ở ĐÂY ĐỂ LƯU VÀO DATABASE CHO ADMIN THẤY
+      orderData.order_price = totalCalculatedPrice + totalShippingCost + perOrderFee; 
     }
 
     const extractedIds = formattedOrders.map((o: any) => o.external_order_id);
