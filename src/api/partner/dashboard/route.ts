@@ -94,15 +94,15 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
     let total_saved_amount = 0;
     
     const total_revenue = orders.reduce((sum: number, order: any) => {
-      // Công thức: Giá hiển thị Seller = Giá DB - Phí xử lý đơn
-      const displayPrice = Math.max(0, Number(order.order_price || 0) - perOrderFee);
+      // Trả lại giá trị gốc có bao gồm phí xử lý đơn
+      const price = Number(order.order_price || 0);
 
       if (order.status === 'support') {
         total_supported_orders++;
-        total_saved_amount += displayPrice; // Trừ luôn ở khối support
+        total_saved_amount += price; 
       }
       if (paidStatuses.includes(order.status)) {
-        return sum + displayPrice; // Trừ phí khỏi tổng doanh thu
+        return sum + price; 
       }
       return sum;
     }, 0);
@@ -130,8 +130,7 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
     orders.forEach((order: any) => {
       const orderDate = new Date(order.order_date);
       const isPaid = paidStatuses.includes(order.status);
-      const displayPrice = Math.max(0, Number(order.order_price || 0) - perOrderFee);
-      const price = isPaid ? displayPrice : 0;
+      const price = isPaid ? Number(order.order_price || 0) : 0;
 
       let bucketKey = '';
       
@@ -210,8 +209,8 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
     let total_debt_generated = 0;
     allTimeOrders.forEach((o: any) => {
       if (paidStatuses.includes(o.status)) {
-        const displayPrice = Math.max(0, Number(o.order_price || 0) - perOrderFee);
-        total_debt_generated += displayPrice; // Công nợ Seller thấy đã được trừ phí
+        // Cộng thẳng order_price (đã có phí) vào công nợ
+        total_debt_generated += Number(o.order_price || 0);
       }
     });
 
