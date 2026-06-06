@@ -21,6 +21,23 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
     }
     // -----------------------------------------------------------
     
+    let perOrderFee = 0;
+    let special_discount = "$0";
+    let discount_note = "Hạng thành viên tiêu chuẩn";
+    
+    try {
+      // Dùng listSellers giống file orders lúc nãy cho đồng bộ
+      const sellers = await sellerService.listSellers({ id: currentSellerId });
+      if (sellers && sellers.length > 0) {
+        perOrderFee = Number(sellers[0].per_order_fee || 0);
+        special_discount = sellers[0].special_discount || "$0";
+        discount_note = sellers[0].discount_note || "Hạng thành viên tiêu chuẩn";
+      }
+    } catch (e) {
+      console.error("Lỗi khi lấy thông tin Seller:", e);
+    }
+    // ========================================
+
     const shop_id = req.query.shop_id as string;
     const range = (req.query.range as string) || 'month';
 
@@ -199,19 +216,7 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
     });
 
     const current_debt = total_debt_generated - total_paid;
-    let special_discount = "$0";
-    let discount_note = "Hạng thành viên tiêu chuẩn";
     
-    try {
-      const currentSeller = await sellerService.retrieveSeller(currentSellerId);
-      const perOrderFee = currentSeller?.per_order_fee || 0;
-      if (currentSeller) {
-        special_discount = currentSeller.special_discount || "$0";
-        discount_note = currentSeller.discount_note || "Hạng thành viên tiêu chuẩn";
-      }
-    } catch (e) {
-      console.error("Lỗi khi lấy thông tin ưu đãi Seller:", e);
-    }
     // ==========================================
     // 7. TRẢ KẾT QUẢ VỀ FRONTEND
     // ==========================================
