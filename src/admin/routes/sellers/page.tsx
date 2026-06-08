@@ -868,8 +868,15 @@ export default function SellersAdminPage() {
             <table className="w-full text-left text-sm whitespace-nowrap">
               <thead className="bg-gray-50 border-b border-gray-200 text-gray-500">
                 <tr>
+                  <tr>
                   <th className="px-4 py-3 w-10">
-                    <input type="checkbox" onChange={handleSelectAll} checked={selectedIds.length === ordersList.length && ordersList.length > 0} className="cursor-pointer"/>
+                    <input 
+                      type="checkbox" 
+                      onChange={handleSelectAll} 
+                      // Ép hiện dấu tích nếu đang ở chế độ Chọn toàn bộ
+                      checked={isSelectAllPages || (selectedIds.length === ordersList.length && ordersList.length > 0)} 
+                      className="cursor-pointer"
+                    />
                   </th>
                   <th className="px-4 py-3 font-semibold">Mã Đơn / Trạng thái</th>
                   <th className="px-4 py-3 font-semibold">Shop & Khách</th>
