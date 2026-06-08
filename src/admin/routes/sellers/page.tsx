@@ -443,9 +443,14 @@ export default function SellersAdminPage() {
   const handleExport = async (mode: 'selected' | 'filtered') => {
     setIsLoading(true);
     try {
-      const queryParams = new URLSearchParams({ limit: "all" });
+      // 1. Dùng số siêu lớn thay vì chữ "all" để Backend parse thành số nguyên thành công
+      const queryParams = new URLSearchParams({ limit: "999999" });
       
-      if (mode === 'selected') {
+      // 2. LOGIC QUAN TRỌNG: Nếu đang là mode 'selected' NHƯNG lại tích "Chọn toàn bộ (isSelectAllPages)"
+      // Thì chúng ta phải ép nó xuất theo bộ lọc (filtered) để lấy sạch dữ liệu thay vì chỉ lấy ID trang hiện tại.
+      const actualMode = (mode === 'selected' && isSelectAllPages) ? 'filtered' : mode;
+
+      if (actualMode === 'selected') {
         if (selectedIds.length === 0) {
           alert("Vui lòng chọn ít nhất 1 đơn hàng để xuất CSV.");
           setIsLoading(false);
@@ -453,6 +458,7 @@ export default function SellersAdminPage() {
         }
         queryParams.append("order_ids", selectedIds.join(","));
       } else {
+        // Chế độ 'filtered' (Xuất toàn bộ theo điều kiện lọc hiện tại)
         if (selectedShopId) queryParams.append("shop_id", selectedShopId);
         if (selectedSellerId) queryParams.append("seller_id", selectedSellerId);
         if (searchQuery) queryParams.append("search", searchQuery);
@@ -462,14 +468,19 @@ export default function SellersAdminPage() {
       }
 
       const res = await fetch(`/admin/seller-orders?${queryParams.toString()}`, { credentials: 'include' }).then(r => r.json());
-      downloadCSV(res.orders);
+      
+      if (!res.orders || res.orders.length === 0) {
+        alert("Không có đơn hàng nào khớp với bộ lọc để xuất!");
+      } else {
+        downloadCSV(res.orders);
+      }
     } catch (error) {
       console.error("Lỗi xuất CSV:", error);
+      alert("Đã xảy ra lỗi khi xuất file. Vui lòng xem console.");
     } finally {
       setIsLoading(false);
     }
   };
-
   const handleTrackingUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
