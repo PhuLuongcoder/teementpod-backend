@@ -888,10 +888,15 @@ export default function SellersAdminPage() {
               <tbody className="divide-y divide-gray-200">
                 {ordersList.map(order => {
                   const isActioning = actioningIds.includes(order.id);
+                  // Biến kiểm tra xem dòng này có đang được chọn hay không
+                  const isRowSelected = isSelectAllPages || selectedIds.includes(order.id);
+
                   return (
-                    <tr key={order.id} className={clx("hover:bg-gray-50 cursor-pointer transition-colors", selectedIds.includes(order.id) && "bg-blue-50/50")} onClick={() => toggleSelect(order.id)}>
+                    // Cập nhật đổi màu nền (bg-blue) dựa trên isRowSelected
+                    <tr key={order.id} className={clx("hover:bg-gray-50 cursor-pointer transition-colors", isRowSelected && "bg-blue-50/50")} onClick={() => toggleSelect(order.id)}>
                       <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                        <input type="checkbox" checked={selectedIds.includes(order.id)} onChange={() => toggleSelect(order.id)} className="cursor-pointer accent-blue-600"/>
+                        {/* Cập nhật dấu tích checked dựa trên isRowSelected */}
+                        <input type="checkbox" checked={isRowSelected} onChange={() => toggleSelect(order.id)} className="cursor-pointer accent-blue-600"/>
                       </td>
                       <td className="px-4 py-3">
                         <div className="font-semibold text-gray-900">{order.external_order_id}</div>
