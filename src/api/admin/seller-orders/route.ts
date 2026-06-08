@@ -4,8 +4,17 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
   try {
     const sellerService = req.scope.resolve("sellerModuleService") as any;
     const page = parseInt(req.query.page as string) || 1;
-    const limit = 10;
-    const skip = (page - 1) * limit;
+    
+    // --- BẮT ĐẦU SỬA: LINH HOẠT XỬ LÝ LIMIT ĐỂ PHỤC VỤ XUẤT FILE CSV ---
+    let limit = 10; // Mặc định hiển thị 10 đơn trên phân trang
+    if (req.query.limit === "all" || req.query.limit === "999999") {
+      limit = 999999; // Mở khóa giới hạn khi bấm xuất CSV
+    } else if (req.query.limit) {
+      limit = parseInt(req.query.limit as string);
+    }
+    
+    const skip = limit >= 999999 ? 0 : (page - 1) * limit;
+    // --- KẾT THÚC SỬA ---
 
     const { shop_id, seller_id, search, startDate, endDate, status } = req.query as any;
     let filters: any = {};
