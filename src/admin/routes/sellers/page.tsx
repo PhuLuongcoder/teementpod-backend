@@ -161,11 +161,20 @@ export default function SellersAdminPage() {
   }
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.checked) setSelectedIds(ordersList.map(o => o.id))
-    else setSelectedIds([])
+    if (e.target.checked) {
+      setSelectedIds(ordersList.map(o => o.id));
+    } else {
+      setSelectedIds([]);
+      setIsSelectAllPages(false); // Bỏ tích thì tắt luôn chế độ Chọn toàn bộ
+    }
   }
 
   const toggleSelect = (id: string) => {
+    // CHẶN: Không cho tích/bỏ tích lẻ tẻ khi đang bật chế độ Chọn toàn bộ
+    if (isSelectAllPages) {
+      alert("Bạn đang ở chế độ CHỌN TẤT CẢ các trang.\nVui lòng bấm 'Bỏ chọn' (trên thanh công cụ màu đen hoặc thông báo màu xanh) nếu muốn chọn lại từng đơn nhé!");
+      return;
+    }
     setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])
   }
 
