@@ -179,16 +179,34 @@ export default function SellersAdminPage() {
   }
 
   const handleBulkAction = async (action: 'approve' | 'reject' | 'delete' | 'unapprove' | 'restore') => {
-    if (action === 'delete' && !confirm(`Bạn có chắc chắn muốn xóa ${selectedIds.length} đơn hàng?`)) return;
+    // Hiển thị đúng số lượng sẽ bị tác động
+    const targetCount = isSelectAllPages ? totalCount : selectedIds.length;
+    if (action === 'delete' && !confirm(`Bạn có chắc chắn muốn xóa ${targetCount} đơn hàng?`)) return;
     
     setIsBulking(true);
     try {
+      let finalIds = selectedIds;
+
+      // NẾU CHỌN TOÀN BỘ: Tự động tải ngầm toàn bộ ID khớp với bộ lọc
+      if (isSelectAllPages) {
+        const params = new URLSearchParams({ limit: "999999", shop_id: selectedShopId, seller_id: selectedSellerId });
+        if (activeTab !== 'all') params.append('status', activeTab);
+        if (searchQuery) params.append('search', searchQuery);
+        if (startDate) params.append('startDate', startDate);
+        if (endDate) params.append('endDate', endDate);
+
+        const res = await fetch(`/admin/seller-orders?${params.toString()}`, { credentials: 'include' }).then(r => r.json());
+        finalIds = res.orders.map((o: any) => o.id);
+      }
+
       await fetch('/admin/seller-orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ order_ids: selectedIds, action })
+        body: JSON.stringify({ order_ids: finalIds, action })
       });
+      
       setSelectedIds([]);
+      setIsSelectAllPages(false);
       await fetchData(currentPage);
     } catch (error) {
       console.error("Lỗi thực hiện batch action:", error);
@@ -233,11 +251,24 @@ export default function SellersAdminPage() {
   const handleBulkReship = async () => {
     setIsSubmittingReship(true);
     try {
+      let finalIds = selectedIds;
+      
+      if (isSelectAllPages) {
+        const params = new URLSearchParams({ limit: "999999", shop_id: selectedShopId, seller_id: selectedSellerId });
+        if (activeTab !== 'all') params.append('status', activeTab);
+        if (searchQuery) params.append('search', searchQuery);
+        if (startDate) params.append('startDate', startDate);
+        if (endDate) params.append('endDate', endDate);
+
+        const res = await fetch(`/admin/seller-orders?${params.toString()}`, { credentials: 'include' }).then(r => r.json());
+        finalIds = res.orders.map((o: any) => o.id);
+      }
+
       const res = await fetch("/admin/seller-orders/reship", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          order_ids: selectedIds,
+          order_ids: finalIds,
           cost_policy: reshipPolicy,
           reason: reshipReason
         })
@@ -248,6 +279,7 @@ export default function SellersAdminPage() {
         alert(data.message || "Đã đẩy các đơn đi lại vào sản xuất thành công!");
         setIsReshipModalOpen(false); 
         setSelectedIds([]); 
+        setIsSelectAllPages(false);
         fetchData(currentPage); 
       } else {
         alert("Lỗi: " + data.error);
@@ -542,7 +574,8 @@ export default function SellersAdminPage() {
   const displayedShops = selectedSellerId 
     ? sellers.find(s => s.id === selectedSellerId)?.shops || []
     : sellers.flatMap(s => s.shops || []);
-
+  
+  const isCurrentPageFullySelected = ordersList.length > 0 && ordersList.every(o => selectedIds.includes(o.id));
   if (isLoading && ordersList.length === 0 && sellers.length === 0) {
     return <div className="p-8 text-gray-500">Đang tải dữ liệu hệ thống...</div>
   }
@@ -868,13 +901,12 @@ export default function SellersAdminPage() {
             <table className="w-full text-left text-sm whitespace-nowrap">
               <thead className="bg-gray-50 border-b border-gray-200 text-gray-500">
                 <tr>
-                  <tr>
                   <th className="px-4 py-3 w-10">
                     <input 
                       type="checkbox" 
                       onChange={handleSelectAll} 
-                      // Ép hiện dấu tích nếu đang ở chế độ Chọn toàn bộ
-                      checked={isSelectAllPages || (selectedIds.length === ordersList.length && ordersList.length > 0)} 
+                      // ĐÃ SỬA: Sẽ hiển thị đúng trạng thái chọn của trang hiện tại hoặc toàn bộ
+                      checked={isSelectAllPages || isCurrentPageFullySelected} 
                       className="cursor-pointer"
                     />
                   </th>
