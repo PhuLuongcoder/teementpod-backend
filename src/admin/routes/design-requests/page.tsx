@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react"
 import { defineRouteConfig } from "@medusajs/admin-sdk"
-import { PaintBrush, CheckCircleSolid } from "@medusajs/icons"
+import { DocumentText, CheckCircleSolid } from "@medusajs/icons"
 import { Button, Container, Heading, Table, Badge, Input, Text, Textarea } from "@medusajs/ui"
 
 // Khai báo route trên thanh menu Admin của Medusa
 export const config = defineRouteConfig({
   label: "Đơn Thiết Kế",
-  icon: PaintBrush,
+  icon: DocumentText,
 })
 
 export default function DesignRequestsAdminPage() {
