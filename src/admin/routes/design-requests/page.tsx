@@ -70,22 +70,23 @@ export default function DesignRequestsAdminPage() {
     if (!resultUrl.trim()) return alert("Vui lòng dán link file kết quả!")
     
     try {
-      // Gọi API giao file cho Seller
-      /*
-      await fetch(`/admin/service-requests/${selectedReq.id}/deliver`, {
+      // Bỏ comment đoạn này để chạy API thật
+      const res = await fetch(`/admin/service-requests/${selectedReq.id}/deliver`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ result_image_url: resultUrl })
       })
-      */
+      const data = await res.json();
       
-      // Update local state (Mock)
-      setRequests(requests.map(r => r.id === selectedReq.id ? { ...r, status: 'waiting_approval', result_image_url: resultUrl } : r))
-      
-      setIsModalOpen(false)
-      setSelectedReq(null)
-      setResultUrl("")
-      alert("Đã giao file thành công! Chờ Seller duyệt.")
+      if(data.status === "success") {
+        setIsModalOpen(false)
+        setSelectedReq(null)
+        setResultUrl("")
+        alert("Đã giao file thành công! Chờ Seller duyệt.")
+        fetchRequests() // Load lại bảng
+      } else {
+        alert("Lỗi: " + data.error)
+      }
     } catch (error) {
       console.error(error)
     }
