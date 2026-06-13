@@ -8,7 +8,7 @@ import { PodPrice } from "./models/pod-price"
 import { PodBlank } from "./models/pod-blank"
 import { PaymentHistory } from "./models/payment-history"
 import { Service } from "./models/service"
-
+import { ServiceRequest } from "./models/service-request"
 class SellerModuleService extends MedusaService({
   Seller,
   Shop,
@@ -19,6 +19,7 @@ class SellerModuleService extends MedusaService({
   PodBlank,
   PaymentHistory,
   Service,
+  ServiceRequest,
 }) {
 }
 
