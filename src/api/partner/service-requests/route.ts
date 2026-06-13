@@ -43,6 +43,18 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     if (!original_image_url) return res.status(400).json({ error: "Thiếu link ảnh gốc" });
 
     // Tạo bản ghi - Ghi nhận công nợ (unpaid) và Trạng thái chờ Admin (in_process)
+    const { original_image_url } = req.body;
+
+    // 1. Kiểm tra độ dài (Tránh spam data rác làm phình DB)
+    if (original_image_url.length > 1000) {
+      return res.status(400).json({ error: "Link quá dài, vui lòng sử dụng link rút gọn hợp lệ." });
+    }
+    
+    // 2. Ép kiểu URL chuẩn (Chống XSS và script độc hại)
+    const urlPattern = /^(https?:\/\/)([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(:\d+)?(\/[^\s]*)?$/;
+    if (!urlPattern.test(original_image_url)) {
+      return res.status(400).json({ error: "Link ảnh không hợp lệ. Vui lòng nhập đúng định dạng http:// hoặc https://" });
+    }
     const newRequest = await sellerService.createServiceRequests({
       seller_id,
       service_id,
