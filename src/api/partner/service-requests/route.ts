@@ -38,23 +38,27 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || "super-secret-key-teement") as any;
     const seller_id = decoded.seller_id;
 
+    // Khai báo duy nhất 1 lần ở đây
     const { service_id, type, quantity, instructions, original_image_url, price } = req.body as any;
 
-    if (!original_image_url) return res.status(400).json({ error: "Thiếu link ảnh gốc" });
+    if (!original_image_url) {
+      return res.status(400).json({ error: "Thiếu link ảnh gốc" });
+    }
 
-    // Tạo bản ghi - Ghi nhận công nợ (unpaid) và Trạng thái chờ Admin (in_process)
-    const { original_image_url } = req.body;
-
-    // 1. Kiểm tra độ dài (Tránh spam data rác làm phình DB)
+    // --- KHỐI BẢO MẬT & KIỂM TRA ĐẦU VÀO ---
+    // 1. Kiểm tra độ dài (Tránh spam data rác)
     if (original_image_url.length > 1000) {
       return res.status(400).json({ error: "Link quá dài, vui lòng sử dụng link rút gọn hợp lệ." });
     }
-    
-    // 2. Ép kiểu URL chuẩn (Chống XSS và script độc hại)
+
+    // 2. Ép kiểu URL chuẩn (Chống XSS)
     const urlPattern = /^(https?:\/\/)([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(:\d+)?(\/[^\s]*)?$/;
     if (!urlPattern.test(original_image_url)) {
       return res.status(400).json({ error: "Link ảnh không hợp lệ. Vui lòng nhập đúng định dạng http:// hoặc https://" });
     }
+    // ----------------------------------------
+
+    // Tạo bản ghi - Ghi nhận công nợ (unpaid) và Trạng thái chờ Admin (in_process)
     const newRequest = await sellerService.createServiceRequests({
       seller_id,
       service_id,
