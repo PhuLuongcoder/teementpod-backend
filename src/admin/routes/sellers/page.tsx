@@ -35,35 +35,32 @@ export default function SellersAdminPage() {
   const [isPrinterModalOpen, setIsPrinterModalOpen] = useState(false);
   const [bulkPrinterName, setBulkPrinterName] = useState('');
   const [updatingPrinterIds, setUpdatingPrinterIds] = useState<string[]>([]);
-
-  // Hàm gọi API cập nhật Nhà In (Dùng chung cho cả Inline và Bulk)
+  
   const handleUpdatePrinter = async (orderIds: string[], printerName: string) => {
     setUpdatingPrinterIds(orderIds);
     try {
-      // Giả sử API của bác là POST /admin/seller-orders/bulk-printer
       const res = await fetch('/admin/seller-orders/bulk-printer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          order_ids: orderIds,
-          printer_name: printerName
-        })
+        body: JSON.stringify({ order_ids: orderIds, printer_name: printerName })
       });
       
       const data = await res.json();
       if (data.success) {
-        // Cập nhật lại list đơn hàng hiện tại trên state để UI ăn ngay mà không cần reload
-        setOrdersList(prev => prev.map(order => 
-          orderIds.includes(order.id) ? { ...order, printer_name: printerName } : order
-        ));
+        // Cập nhật lại UI ngay lập tức mà không cần fetch lại toàn bộ bảng
+        setOrdersList(prev => prev.map(order => {
+          if (orderIds.includes(order.id)) {
+            return { ...order, metadata: { ...order.metadata, printer_name: printerName } };
+          }
+          return order;
+        }));
         setIsPrinterModalOpen(false);
         setBulkPrinterName('');
-        setSelectedIds([]); // Bỏ chọn sau khi update bulk xong
+        setSelectedIds([]); 
       } else {
-        alert(`Lỗi: ${data.message || 'Không thể cập nhật Nhà in'}`);
+        alert(`Lỗi: ${data.message}`);
       }
     } catch (error) {
-      console.error("Lỗi cập nhật Nhà In:", error);
       alert("Đã xảy ra lỗi mạng khi cập nhật Nhà in.");
     } finally {
       setUpdatingPrinterIds([]);
@@ -502,7 +499,9 @@ export default function SellersAdminPage() {
           escapeCSV(item.color || ""), escapeCSV(item.size || ""),                                  
           escapeCSV(item.quantity || 1), // <--- THÊM CỘT SỐ LƯỢNG Ở ĐÂY
           escapeCSV(item.design_front || order.design_front_url || ""), escapeCSV(item.design_back || order.design_back_url || ""),   
-          escapeCSV(finalMockups), escapeCSV(order.order_note || "")                           
+          escapeCSV(finalMockups), escapeCSV(order.order_note || ""),
+          escapeCSV(finalMockups), escapeCSV(order.order_note || ""),
+          escapeCSV(order.metadata?.printer_name || "")
         ];
         csvRows.push(row.join(","));
       });
@@ -993,33 +992,50 @@ export default function SellersAdminPage() {
                       </td>
                       <td className="px-4 py-3">{renderProductColumn(order)}</td>
                       {/* CỘT HIỂN THỊ DESIGN (INLINE) */}
-                      <td className="px-4 py-3">
-                        <div className="flex flex-wrap gap-2 justify-center max-w-[120px]">
+                      <td className="px-4 py-3 text-center">
+                        <div className="flex flex-wrap gap-1 justify-center min-w-[80px]">
                           {order.items?.length > 0 ? (
                             order.items.map((item: any, idx: number) => (
                               <div key={idx} className="flex gap-1">
                                 {item.design_front && (
                                   <a href={item.design_front} target="_blank" rel="noreferrer" title="Mặt trước">
-                                    <img src={item.design_front} className="w-8 h-8 rounded border border-gray-300 object-cover hover:scale-150 transition-transform" />
+                                    <img src={item.design_front} className="w-8 h-8 rounded border border-gray-200 object-cover hover:scale-150 transition-transform shadow-sm bg-white" />
                                   </a>
                                 )}
                                 {item.design_back && (
                                   <a href={item.design_back} target="_blank" rel="noreferrer" title="Mặt sau">
-                                    <img src={item.design_back} className="w-8 h-8 rounded border border-gray-300 object-cover hover:scale-150 transition-transform" />
+                                    <img src={item.design_back} className="w-8 h-8 rounded border border-gray-200 object-cover hover:scale-150 transition-transform shadow-sm bg-white" />
                                   </a>
                                 )}
                               </div>
                             ))
                           ) : (
-                            /* Fallback cho đơn cũ không có items mảng */
-                            <div className="flex gap-1">
-                              {order.design_front_url && (
-                                <a href={order.design_front_url} target="_blank" rel="noreferrer">
-                                  <img src={order.design_front_url} className="w-8 h-8 rounded border border-gray-300 object-cover hover:scale-150 transition-transform" />
-                                </a>
-                              )}
-                            </div>
+                            <span className="text-[10px] text-gray-400">---</span>
                           )}
+                        </div>
+                      </td>
+
+                      {/* CỘT NHẬP NHÀ IN (ĐỌC & LƯU VÀO METADATA) */}
+                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                        <div className="relative flex items-center">
+                          <input 
+                            type="text"
+                            defaultValue={order.metadata?.printer_name || ""}
+                            placeholder="Nhà in..."
+                            className={clx(
+                              "border p-1.5 w-24 text-xs rounded outline-none focus:ring-2 focus:ring-blue-500 transition-all",
+                              updatingPrinterIds.includes(order.id) ? "bg-gray-100 text-gray-400" : "bg-white"
+                            )}
+                            onBlur={(e) => {
+                              const newVal = e.target.value.trim();
+                              if (newVal !== (order.metadata?.printer_name || "")) {
+                                handleUpdatePrinter([order.id], newVal);
+                              }
+                            }}
+                            onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                            disabled={updatingPrinterIds.includes(order.id)}
+                          />
+                          {updatingPrinterIds.includes(order.id) && <Spinner className="w-3 h-3 absolute right-2 text-blue-600 animate-spin" />}
                         </div>
                       </td>
 
@@ -1459,37 +1475,25 @@ export default function SellersAdminPage() {
               </Button>
             </Drawer.Footer>
           </Drawer.Content>
-          {/* ================================================= */}
-          {/* POPUP PHÂN BỔ NHÀ IN HÀNG LOẠT */}
-          {/* ================================================= */}
           {isPrinterModalOpen && (
             <FocusModal open={isPrinterModalOpen} onOpenChange={setIsPrinterModalOpen}>
               <FocusModal.Content aria-describedby="printer-desc">
-                <span id="printer-desc" className="sr-only">Nhập tên nhà in để cập nhật hàng loạt</span>
-                <FocusModal.Header>
-                  <Heading>Phân bổ Nhà In ({selectedIds.length} đơn)</Heading>
-                </FocusModal.Header>
+                <span id="printer-desc" className="sr-only">Cập nhật nhà in</span>
+                <FocusModal.Header><Heading>Phân bổ Nhà In ({selectedIds.length} đơn)</Heading></FocusModal.Header>
                 <FocusModal.Body className="p-8 bg-gray-50 flex flex-col items-center">
                   <div className="w-full max-w-md bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex flex-col gap-y-4">
-                    <label className="text-sm font-bold text-gray-700">Nhập tên Nhà In cho các đơn đã chọn:</label>
+                    <label className="text-sm font-bold text-gray-700">Tên Nhà In lưu vào hệ thống:</label>
                     <input 
-                      type="text"
-                      value={bulkPrinterName}
-                      onChange={(e) => setBulkPrinterName(e.target.value)}
+                      type="text" value={bulkPrinterName} onChange={(e) => setBulkPrinterName(e.target.value)}
                       className="w-full p-3 border border-gray-300 rounded-lg outline-none focus:border-blue-500 font-medium"
-                      placeholder="Ví dụ: Xưởng A, Printify, SwiftPOD..."
-                      autoFocus
+                      placeholder="Ví dụ: Xưởng A, Printify..." autoFocus
                     />
                     <div className="flex justify-end gap-3 mt-4">
                       <Button variant="transparent" onClick={() => setIsPrinterModalOpen(false)}>Hủy</Button>
-                      <Button 
-                        variant="secondary" 
-                        className="bg-teal-600 text-white hover:bg-teal-700 font-bold"
-                        isLoading={updatingPrinterIds.length > 0}
-                        onClick={() => handleUpdatePrinter(selectedIds, bulkPrinterName)}
-                        disabled={!bulkPrinterName.trim()}
-                      >
-                        Lưu phân bổ
+                      <Button variant="secondary" className="bg-teal-600 text-white hover:bg-teal-700 font-bold"
+                        isLoading={updatingPrinterIds.length > 0} disabled={!bulkPrinterName.trim()}
+                        onClick={() => handleUpdatePrinter(selectedIds, bulkPrinterName)}>
+                        Lưu cấu hình
                       </Button>
                     </div>
                   </div>
