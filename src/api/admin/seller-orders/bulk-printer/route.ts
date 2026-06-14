@@ -8,21 +8,25 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
       return res.status(400).json({ success: false, message: "Chưa chọn đơn hàng nào!" });
     }
 
-    // Gọi service quản lý đơn hàng Seller của bác (Tên service tùy thuộc vào code của bác)
+    // Gọi service quản lý
     const sellerService = req.scope.resolve("sellerModuleService") as any;
 
-    // Lặp qua các ID để update metadata
+    // 1. Quét qua tất cả ID để lấy Metadata hiện tại (tránh ghi đè mất dữ liệu cũ)
+    const updateData = [];
     for (const id of order_ids) {
-      // 1. Lấy thông tin đơn hàng hiện tại
-      const order = await sellerService.retrieveSellerOrder(id); // (Lưu ý sửa tên hàm retrieve cho đúng code bác)
+      const order = await sellerService.retrieveSellerOrder(id);
       
-      // 2. Gom metadata cũ và đè printer_name mới vào
-      const currentMetadata = order.metadata || {};
-      const newMetadata = { ...currentMetadata, printer_name: printer_name };
-
-      // 3. Lưu lại
-      await sellerService.updateSellerOrder(id, { metadata: newMetadata }); // (Lưu ý sửa tên hàm update cho đúng code bác)
+      updateData.push({
+        id: id,
+        metadata: {
+          ...(order.metadata || {}), // Giữ nguyên các metadata khác nếu có
+          printer_name: printer_name // Chèn/Sửa tên nhà in vào
+        }
+      });
     }
+
+    // 2. Dùng hàm chuẩn Medusa v2 để Update hàng loạt chỉ trong 1 lệnh DB
+    await sellerService.updateSellerOrders(updateData);
 
     return res.json({ success: true, message: "Cập nhật Nhà In thành công!" });
 
