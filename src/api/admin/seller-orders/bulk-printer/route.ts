@@ -12,7 +12,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     const sellerService = req.scope.resolve("sellerModuleService") as any;
 
     // 1. Quét qua tất cả ID để lấy Metadata hiện tại (tránh ghi đè mất dữ liệu cũ)
-    const updateData = [];
+    const updateData: any[] = [];
     for (const id of order_ids) {
       const order = await sellerService.retrieveSellerOrder(id);
       
