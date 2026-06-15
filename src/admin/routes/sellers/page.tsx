@@ -9,11 +9,6 @@ export const config = defineRouteConfig({
   label: "Quản lý Seller", // Tên hiển thị trên menu
   icon: Users,             // Icon mặc định của Medusa
 })
-export const config = defineRouteConfig({
-  label: "Quản lý Seller", // Tên hiển thị trên menu
-  icon: Users,             // Icon mặc định của Medusa
-})
-
 // === THÊM HÀM XỬ LÝ LINK GOOGLE DRIVE VÀO ĐÂY ===
 const getDirectImageUrl = (url: string) => {
   if (!url) return "";
