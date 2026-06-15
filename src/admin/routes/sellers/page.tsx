@@ -9,7 +9,20 @@ export const config = defineRouteConfig({
   label: "Quản lý Seller", // Tên hiển thị trên menu
   icon: Users,             // Icon mặc định của Medusa
 })
+export const config = defineRouteConfig({
+  label: "Quản lý Seller", // Tên hiển thị trên menu
+  icon: Users,             // Icon mặc định của Medusa
+})
 
+// === THÊM HÀM XỬ LÝ LINK GOOGLE DRIVE VÀO ĐÂY ===
+const getDirectImageUrl = (url: string) => {
+  if (!url) return "";
+  const match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if (match && match[1]) {
+    return `https://drive.google.com/uc?export=view&id=${match[1]}`;
+  }
+  return url;
+};
 // 2. GIAO DIỆN CHÍNH
 export default function SellersAdminPage() {
   const [sellers, setSellers] = useState<any[]>([])
@@ -999,12 +1012,12 @@ export default function SellersAdminPage() {
                               <div key={idx} className="flex gap-1">
                                 {item.design_front && (
                                   <a href={item.design_front} target="_blank" rel="noreferrer" title="Mặt trước">
-                                    <img src={item.design_front} className="w-8 h-8 rounded border border-gray-200 object-cover hover:scale-150 transition-transform shadow-sm bg-white" />
+                                    <img src={getDirectImageUrl(item.design_front)} className="w-8 h-8 rounded border border-gray-200 object-cover hover:scale-150 transition-transform shadow-sm bg-white" />
                                   </a>
                                 )}
                                 {item.design_back && (
                                   <a href={item.design_back} target="_blank" rel="noreferrer" title="Mặt sau">
-                                    <img src={item.design_back} className="w-8 h-8 rounded border border-gray-200 object-cover hover:scale-150 transition-transform shadow-sm bg-white" />
+                                    <img src={getDirectImageUrl(item.design_back)} className="w-8 h-8 rounded border border-gray-200 object-cover hover:scale-150 transition-transform shadow-sm bg-white" />
                                   </a>
                                 )}
                               </div>
