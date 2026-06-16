@@ -25,6 +25,31 @@ const getDirectImageUrl = (url: string) => {
   // Nếu không phải link Google Drive thì giữ nguyên link gốc
   return url;
 };
+const isValidImageUrl = (url?: string): boolean => {
+  if (!url || typeof url !== 'string') return false;
+  const trimmed = url.trim();
+  if (!trimmed.toLowerCase().startsWith('http')) return false;
+  try {
+    const parsed = new URL(trimmed);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+};
+
+// Hàm tự động bóc tách ID từ link Google Drive
+const convertGoogleDriveUrl = (url?: string): string => {
+  if (!url) return '';
+  const fileMatch = url.match(/\/file\/d\/([^\/]+)/);
+  if (fileMatch?.[1]) {
+    return `https://drive.google.com/thumbnail?id=${fileMatch[1]}&sz=w1000`;
+  }
+  const openMatch = url.match(/[?&]id=([^&]+)/);
+  if (openMatch?.[1]) {
+    return `https://drive.google.com/thumbnail?id=${openMatch[1]}&sz=w1000`;
+  }
+  return url;
+};
 // 2. GIAO DIỆN CHÍNH
 export default function SellersAdminPage() {
   const [sellers, setSellers] = useState<any[]>([])
@@ -1008,30 +1033,64 @@ export default function SellersAdminPage() {
                       <td className="px-4 py-3">{renderProductColumn(order)}</td>
                       {/* CỘT HIỂN THỊ DESIGN (INLINE) */}
                       <td className="px-4 py-3 text-center">
-                        <div className="flex flex-wrap gap-1 justify-center min-w-[80px]">
+                        <div className="flex flex-wrap gap-2 justify-center min-w-[80px]">
                           {order.items?.length > 0 ? (
                             order.items.map((item: any, idx: number) => (
-                              <div key={idx} className="flex gap-1">
-                                {item.design_front && (
-                                  <a href={item.design_front} target="_blank" rel="noreferrer" title="Mặt trước">
-                                    <img 
-                                      src={getDirectImageUrl(item.design_front)} 
-                                      referrerPolicy="no-referrer" /* <-- Bùa chú chống Google Drive chặn ảnh */
-                                      className="w-8 h-8 rounded border border-gray-200 object-cover hover:scale-150 transition-transform shadow-sm bg-white" 
-                                      alt="Design Front"
-                                    />
-                                  </a>
-                                )}
-                                {item.design_back && (
-                                  <a href={item.design_back} target="_blank" rel="noreferrer" title="Mặt sau">
-                                    <img 
-                                      src={getDirectImageUrl(item.design_back)} 
-                                      referrerPolicy="no-referrer" 
-                                      className="w-8 h-8 rounded border border-gray-200 object-cover hover:scale-150 transition-transform shadow-sm bg-white" 
-                                      alt="Design Back"
-                                    />
-                                  </a>
-                                )}
+                              <div key={idx} className="flex gap-2 justify-center">
+                                {[
+                                  { label: 'Front', url: item.design_front },
+                                  { label: 'Back', url: item.design_back }
+                                ].map((img, i) => {
+                                  if (!img.url) return null;
+                                  const isValidUrl = isValidImageUrl(img.url);
+                                  const isNote = img.url && !isValidUrl;
+
+                                  return (
+                                    <div key={i} className="relative group/inlineImg w-8 h-8 rounded border border-gray-200 flex items-center justify-center overflow-hidden bg-white shadow-sm hover:ring-2 hover:ring-[#C29017] transition-all cursor-help">
+                                      {isValidUrl ? (
+                                        <img
+                                          src={convertGoogleDriveUrl(img.url)}
+                                          alt={img.label}
+                                          className="w-full h-full object-contain p-0.5"
+                                          onError={(e) => {
+                                            e.currentTarget.src = 'https://placehold.co/150x150?text=No+Image';
+                                            e.currentTarget.onerror = null;
+                                          }}
+                                        />
+                                      ) : isNote ? (
+                                        <div className="flex flex-col items-center justify-center p-0.5 w-full h-full bg-yellow-50">
+                                          <span className="text-[10px]">📝</span>
+                                        </div>
+                                      ) : null}
+
+                                      {/* Tính năng: Hover để phóng to ảnh cho Admin dễ nhìn */}
+                                      {isValidUrl && (
+                                        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 hidden group-hover/inlineImg:block z-[999] pointer-events-none">
+                                          <div className="bg-white p-1.5 rounded-lg shadow-xl border border-gray-200">
+                                            <img
+                                              src={convertGoogleDriveUrl(img.url)}
+                                              alt="Preview"
+                                              className="w-auto h-auto max-w-[200px] object-contain rounded"
+                                              onError={(e) => {
+                                                e.currentTarget.src = 'https://placehold.co/150x150?text=No+Image';
+                                                e.currentTarget.onerror = null;
+                                              }}
+                                            />
+                                          </div>
+                                        </div>
+                                      )}
+                                      
+                                      {/* Tính năng: Hover để đọc ghi chú (nếu không phải link ảnh) */}
+                                      {isNote && (
+                                        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 hidden group-hover/inlineImg:block z-[999] pointer-events-none">
+                                          <div className="bg-yellow-50 p-2 rounded-lg shadow-xl border border-yellow-300 min-w-[150px] z-[999]">
+                                            <p className="text-[10px] text-gray-800 whitespace-pre-wrap">{img.url}</p>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
                               </div>
                             ))
                           ) : (
