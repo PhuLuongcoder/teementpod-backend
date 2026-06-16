@@ -10,14 +10,7 @@ export const config = defineRouteConfig({
   icon: Users,             // Icon mặc định của Medusa
 })
 // === THÊM HÀM XỬ LÝ LINK GOOGLE DRIVE VÀO ĐÂY ===
-const getDirectImageUrl = (url: string) => {
-  if (!url) return "";
-  const match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
-  if (match && match[1]) {
-    return `https://drive.google.com/uc?export=view&id=${match[1]}`;
-  }
-  return url;
-};
+
 const getDirectImageUrl = (url: string) => {
   if (!url) return "";
   
