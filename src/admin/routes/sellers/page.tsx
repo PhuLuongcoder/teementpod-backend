@@ -18,6 +18,20 @@ const getDirectImageUrl = (url: string) => {
   }
   return url;
 };
+const getDirectImageUrl = (url: string) => {
+  if (!url) return "";
+  
+  // Kiểm tra nếu là link Google Drive dạng /file/d/
+  const match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+  
+  if (match && match[1]) {
+    const fileId = match[1]; // Bắt đúng đoạn ID của ảnh
+    return `https://drive.google.com/uc?export=view&id=${fileId}`;
+  }
+  
+  // Nếu không phải link Google Drive thì giữ nguyên link gốc
+  return url;
+};
 // 2. GIAO DIỆN CHÍNH
 export default function SellersAdminPage() {
   const [sellers, setSellers] = useState<any[]>([])
@@ -1007,12 +1021,22 @@ export default function SellersAdminPage() {
                               <div key={idx} className="flex gap-1">
                                 {item.design_front && (
                                   <a href={item.design_front} target="_blank" rel="noreferrer" title="Mặt trước">
-                                    <img src={getDirectImageUrl(item.design_front)} className="w-8 h-8 rounded border border-gray-200 object-cover hover:scale-150 transition-transform shadow-sm bg-white" />
+                                    <img 
+                                      src={getDirectImageUrl(item.design_front)} 
+                                      referrerPolicy="no-referrer" /* <-- Bùa chú chống Google Drive chặn ảnh */
+                                      className="w-8 h-8 rounded border border-gray-200 object-cover hover:scale-150 transition-transform shadow-sm bg-white" 
+                                      alt="Design Front"
+                                    />
                                   </a>
                                 )}
                                 {item.design_back && (
                                   <a href={item.design_back} target="_blank" rel="noreferrer" title="Mặt sau">
-                                    <img src={getDirectImageUrl(item.design_back)} className="w-8 h-8 rounded border border-gray-200 object-cover hover:scale-150 transition-transform shadow-sm bg-white" />
+                                    <img 
+                                      src={getDirectImageUrl(item.design_back)} 
+                                      referrerPolicy="no-referrer" 
+                                      className="w-8 h-8 rounded border border-gray-200 object-cover hover:scale-150 transition-transform shadow-sm bg-white" 
+                                      alt="Design Back"
+                                    />
                                   </a>
                                 )}
                               </div>
