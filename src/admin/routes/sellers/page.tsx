@@ -1047,35 +1047,7 @@ export default function SellersAdminPage() {
                         </div>
                       </td>
 
-                      {/* CỘT NHẬP NHÀ IN (INLINE EDIT) */}
-                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                        <div className="relative flex items-center">
-                          <input 
-                            type="text"
-                            defaultValue={order.printer_name || ""}
-                            placeholder="Tên nhà in..."
-                            className={clx(
-                              "border p-1.5 w-24 text-xs rounded outline-none focus:ring-2 focus:ring-blue-500 transition-all",
-                              updatingPrinterIds.includes(order.id) ? "bg-gray-100 text-gray-400" : "bg-white"
-                            )}
-                            onBlur={(e) => {
-                              const newVal = e.target.value.trim();
-                              if (newVal !== (order.printer_name || "")) {
-                                handleUpdatePrinter([order.id], newVal);
-                              }
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                e.currentTarget.blur(); // Nhấn Enter tự động unfocus để lưu
-                              }
-                            }}
-                            disabled={updatingPrinterIds.includes(order.id)}
-                          />
-                          {updatingPrinterIds.includes(order.id) && (
-                            <Spinner className="w-3 h-3 absolute right-2 text-blue-600 animate-spin" />
-                          )}
-                        </div>
-                      </td>
+                      
                       <td className="px-4 py-3 text-xs">
                         {order.tracking_number ? (
                           <div className="flex flex-col gap-1">
