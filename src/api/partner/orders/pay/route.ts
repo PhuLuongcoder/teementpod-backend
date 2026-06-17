@@ -27,7 +27,20 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
       }
 
       // 🛡️ CHỐT CHẶN 2: KIỂM TRA SẢN PHẨM BỊ RỖNG
-      const items = order.product_detail ? (typeof order.product_detail === 'string' ? JSON.parse(order.product_detail) : order.product_detail) : [];
+      let items: any[] = [];
+      try {
+        if (order.items && Array.isArray(order.items) && order.items.length > 0) {
+          items = order.items;
+        } else if (order.product_detail) {
+          const pd = typeof order.product_detail === 'string' ? JSON.parse(order.product_detail) : order.product_detail;
+          if (Array.isArray(pd)) items = pd;
+          else if (pd && Array.isArray(pd.items)) items = pd.items;
+          else items = [pd];
+        }
+      } catch (e) {
+        console.error("Lỗi parse items:", e);
+      }
+
       if (!items || items.length === 0) {
         failedOrders.push(`${order.external_order_id} (Lỗi: Đơn rỗng)`);
         continue;
