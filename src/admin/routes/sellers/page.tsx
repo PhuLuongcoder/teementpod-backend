@@ -1064,7 +1064,7 @@ export default function SellersAdminPage() {
                                   return (
                                     <div 
                                       key={i} 
-                                      className="relative group/inlineImg w-8 h-8 rounded border border-gray-200 flex items-center justify-center overflow-hidden shadow-sm hover:ring-2 hover:ring-[#C29017] transition-all cursor-help"
+                                      className="relative group/inlineImg w-8 h-8 rounded border border-gray-200 flex items-center justify-center shadow-sm hover:ring-2 hover:ring-[#C29017] transition-all cursor-help"
                                       style={{ backgroundColor: getStandardColor(item.color) }} /* <-- MÀU NỀN THEO THUỘC TÍNH COLOR */
                                     >
                                       {isValidUrl ? (
