@@ -10,24 +10,64 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     }
 
     let paidCount = 0;
+    let failedOrders: string[] = [];
 
     for (const id of order_ids) {
       const order = await sellerService.retrieveSellerOrder(id);
       
-      // Chỉ cho phép thanh toán khi đơn hàng đang ở trạng thái pending
-      if (order && order.status === "pending") {
-        await sellerService.updateSellerOrders({
-          id: order.id,
-          status: "complete" // Chuyển đổi trạng thái sau khi pay thành công
-        });
-        paidCount++;
+      // Chỉ xử lý đơn hàng đang pending
+      if (!order || order.status !== "pending") {
+        continue;
       }
+
+      // 🛡️ CHỐT CHẶN 1: TỪ CHỐI ĐƠN 0 ĐỒNG HOẶC NULL
+      if (!order.order_price || order.order_price <= 0) {
+        failedOrders.push(`${order.external_order_id} (Lỗi: Đơn giá $0)`);
+        continue; // Bỏ qua đơn này, chuyển sang đơn tiếp theo
+      }
+
+      // 🛡️ CHỐT CHẶN 2: KIỂM TRA SẢN PHẨM BỊ RỖNG
+      const items = order.product_detail ? (typeof order.product_detail === 'string' ? JSON.parse(order.product_detail) : order.product_detail) : [];
+      if (!items || items.length === 0) {
+        failedOrders.push(`${order.external_order_id} (Lỗi: Đơn rỗng)`);
+        continue;
+      }
+
+      /* * 💡 CHÚ Ý QUAN TRỌNG: TRỪ TIỀN SELLER
+       * Bác bắt buộc phải thêm logic kiểm tra và trừ tiền ví (Wallet/Balance) của Seller ở đây!
+       * * Ví dụ giả lập:
+       * const seller = await sellerService.retrieveSeller(order.seller_id);
+       * if (seller.balance < order.order_price) {
+       * failedOrders.push(`${order.external_order_id} (Lỗi: Số dư không đủ)`);
+       * continue;
+       * }
+       * await sellerService.deductBalance(order.seller_id, order.order_price);
+       */
+
+      // Nếu vượt qua mọi bài test, tiến hành duyệt đơn!
+      await sellerService.updateSellerOrders({
+        id: order.id,
+        status: "complete" // Chuyển đổi trạng thái sau khi pay thành công
+      });
+      paidCount++;
     }
+
+    // Xử lý thông báo trả về cho Frontend
+    if (paidCount === 0) {
+      return res.status(400).json({ 
+        error: `Giao dịch thất bại! Không có đơn nào hợp lệ để thanh toán.\nLý do: ${failedOrders.join(', ')}` 
+      });
+    }
+
+    const warningMsg = failedOrders.length > 0 
+      ? `\n⚠️ Hệ thống đã từ chối ${failedOrders.length} đơn lỗi: ${failedOrders.join(', ')}` 
+      : "";
 
     res.json({
       status: "success",
-      message: `Thanh toán thành công! Đã chuyển tiếp ${paidCount} đơn hàng sang hệ thống xử lý của Admin xưởng.`
+      message: `Thanh toán thành công! Đã chuyển tiếp ${paidCount} đơn hàng sang hệ thống xử lý của Admin xưởng.${warningMsg}`
     });
+
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
