@@ -1085,7 +1085,7 @@ export default function SellersAdminPage() {
 
                                       {/* Tính năng: Hover để phóng to ảnh TOÀN BỘ DESIGN */}
                                       {isValidUrl && (
-                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/inlineImg:block z-[9999] pointer-events-none animate-in fade-in zoom-in duration-200">
+                                        <div className="absolute top-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/inlineImg:block z-[9999] pointer-events-none animate-in fade-in zoom-in duration-200">
                                           <div className="bg-white p-2 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.2)] border border-gray-200">
                                             <img
                                               src={convertGoogleDriveUrl(img.url)}
@@ -1103,7 +1103,7 @@ export default function SellersAdminPage() {
                                       
                                       {/* Tính năng: Hover để đọc ghi chú */}
                                       {isNote && (
-                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/inlineImg:block z-[9999] pointer-events-none animate-in fade-in zoom-in duration-200">
+                                        <div className="absolute top-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/inlineImg:block z-[9999] pointer-events-none animate-in fade-in zoom-in duration-200">
                                           <div className="bg-yellow-50 p-3 rounded-xl shadow-xl border border-yellow-300 min-w-[150px] max-w-[250px]">
                                             <div className="text-[10px] font-bold text-yellow-800 mb-1 uppercase border-b border-yellow-200 pb-1">Ghi chú:</div>
                                             <p className="text-[11px] text-gray-800 whitespace-pre-wrap leading-relaxed">{img.url}</p>
