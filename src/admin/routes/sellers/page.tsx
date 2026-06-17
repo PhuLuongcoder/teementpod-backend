@@ -495,7 +495,7 @@ export default function SellersAdminPage() {
       "Ngày lên đơn", "ID đơn", "Tên Shop", "Tên khách", "Address Line 1", 
       "Address Line 2", "City", "State/Region", "Country", "Zipcode", "Loại sản phẩm", 
       "Màu sản phẩm", "Size sản phẩm", "Số lượng", "Link Design Front", "Link Design Back", 
-      "Link Mock-up", "Ghi chú"
+      "Link Mock-up", "Ghi chú", "Nhà in"
     ];
 
     const escapeCSV = (str: any) => {
@@ -549,15 +549,14 @@ export default function SellersAdminPage() {
           escapeCSV(new Date(order.order_date).toLocaleDateString()), escapeCSV(order.external_order_id),                         
           escapeCSV(order.shop?.name || order.shop_id), escapeCSV(order.customer_name),                               
           escapeCSV(addr.line_1 || addr.address_1 || ""), escapeCSV(addr.line_2 || addr.address_2 || ""),  
-          escapeCSV(addr.city || ""), // Cột City
-          escapeCSV(addr.region || addr.province || addr.state || ""), escapeCSV(addr.country || addr.country_code || ""),          
-          escapeCSV(addr.zip || addr.postal_code || ""), escapeCSV(item.type || order.product_type),                  
-          escapeCSV(item.color || ""), escapeCSV(item.size || ""),                                  
-          escapeCSV(item.quantity || 1), // <--- THÊM CỘT SỐ LƯỢNG Ở ĐÂY
+          escapeCSV(addr.city || ""), 
+          escapeCSV(addr.region || addr.province || addr.state || ""), escapeCSV(addr.country || addr.country_code || ""),         
+          escapeCSV(addr.zip || addr.postal_code || ""), escapeCSV(item.type || order.product_type),                 
+          escapeCSV(item.color || ""), escapeCSV(item.size || ""),                                 
+          escapeCSV(item.quantity || 1), 
           escapeCSV(item.design_front || order.design_front_url || ""), escapeCSV(item.design_back || order.design_back_url || ""),   
           escapeCSV(finalMockups), escapeCSV(order.order_note || ""),
-          escapeCSV(finalMockups), escapeCSV(order.order_note || ""),
-          escapeCSV(order.metadata?.printer_name || "")
+          escapeCSV(order.metadata?.printer_name || "") // <-- Cột data Nhà in sẽ khớp đúng với Header
         ];
         csvRows.push(row.join(","));
       });
