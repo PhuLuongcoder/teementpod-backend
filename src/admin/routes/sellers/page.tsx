@@ -36,7 +36,23 @@ const isValidImageUrl = (url?: string): boolean => {
     return false;
   }
 };
-
+// Hàm chuyển đổi tên màu thành mã HEX để làm hình nền
+const getStandardColor = (colorName?: string) => {
+  if (!colorName) return '#ffffff'; // Mặc định nền trắng
+  const name = colorName.toLowerCase().trim();
+  const colorMap: Record<string, string> = {
+    'sport grey': '#d1d5db', 'dark heather': '#374151', 'heather navy': '#312e81',
+    'light pink': '#fbcfe8', 'light blue': '#bfdbfe', 'navy': '#1e3a8a',
+    'royal': '#1d4ed8', 'maroon': '#7f1d1d', 'forest green': '#064e3b',
+    'charcoal': '#3f3f46', 'sand': '#e5e5cb', 'ash': '#e2e8f0',
+    'irish green': '#16a34a', 'carolina blue': '#7dd3fc', 'heliconia': '#d946ef',
+    'sapphire': '#0284c7', 'kelly green': '#22c55e', 'daisy': '#fde047',
+    'mineral black': '#363636', 'mineral navy': '#2c3e50', 'mineral silver': '#b0b3b8', 
+    'mineral gray': '#696969', 'mineral purple': '#6d5b7b',
+    'black': '#111827', 'white': '#ffffff', 'red': '#ef4444'
+  };
+  return colorMap[name] || colorName;
+};
 // Hàm tự động bóc tách ID từ link Google Drive
 const convertGoogleDriveUrl = (url?: string): string => {
   if (!url) return '';
@@ -1046,31 +1062,36 @@ export default function SellersAdminPage() {
                                   const isNote = img.url && !isValidUrl;
 
                                   return (
-                                    <div key={i} className="relative group/inlineImg w-8 h-8 rounded border border-gray-200 flex items-center justify-center overflow-hidden bg-white shadow-sm hover:ring-2 hover:ring-[#C29017] transition-all cursor-help">
+                                    <div 
+                                      key={i} 
+                                      className="relative group/inlineImg w-8 h-8 rounded border border-gray-200 flex items-center justify-center overflow-hidden shadow-sm hover:ring-2 hover:ring-[#C29017] transition-all cursor-help"
+                                      style={{ backgroundColor: getStandardColor(item.color) }} /* <-- MÀU NỀN THEO THUỘC TÍNH COLOR */
+                                    >
                                       {isValidUrl ? (
                                         <img
                                           src={convertGoogleDriveUrl(img.url)}
                                           alt={img.label}
-                                          className="w-full h-full object-contain p-0.5"
+                                          className="w-full h-full object-contain p-[1px]"
                                           onError={(e) => {
                                             e.currentTarget.src = 'https://placehold.co/150x150?text=No+Image';
                                             e.currentTarget.onerror = null;
                                           }}
                                         />
                                       ) : isNote ? (
-                                        <div className="flex flex-col items-center justify-center p-0.5 w-full h-full bg-yellow-50">
+                                        <div className="flex flex-col items-center justify-center p-0.5 w-full h-full bg-yellow-50/90 border-b border-yellow-300">
                                           <span className="text-[10px]">📝</span>
                                         </div>
                                       ) : null}
 
-                                      {/* Tính năng: Hover để phóng to ảnh cho Admin dễ nhìn */}
+                                      {/* Tính năng: Hover để phóng to ảnh TOÀN BỘ DESIGN */}
                                       {isValidUrl && (
-                                        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 hidden group-hover/inlineImg:block z-[999] pointer-events-none">
-                                          <div className="bg-white p-1.5 rounded-lg shadow-xl border border-gray-200">
+                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/inlineImg:block z-[9999] pointer-events-none animate-in fade-in zoom-in duration-200">
+                                          <div className="bg-white p-2 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.2)] border border-gray-200">
                                             <img
                                               src={convertGoogleDriveUrl(img.url)}
                                               alt="Preview"
-                                              className="w-auto h-auto max-w-[200px] object-contain rounded"
+                                              className="w-auto h-auto max-w-[350px] max-h-[350px] object-contain rounded-lg shadow-inner p-2"
+                                              style={{ backgroundColor: getStandardColor(item.color) }} /* <-- MÀU NỀN CHO CẢ ẢNH TO */
                                               onError={(e) => {
                                                 e.currentTarget.src = 'https://placehold.co/150x150?text=No+Image';
                                                 e.currentTarget.onerror = null;
@@ -1080,11 +1101,12 @@ export default function SellersAdminPage() {
                                         </div>
                                       )}
                                       
-                                      {/* Tính năng: Hover để đọc ghi chú (nếu không phải link ảnh) */}
+                                      {/* Tính năng: Hover để đọc ghi chú */}
                                       {isNote && (
-                                        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 hidden group-hover/inlineImg:block z-[999] pointer-events-none">
-                                          <div className="bg-yellow-50 p-2 rounded-lg shadow-xl border border-yellow-300 min-w-[150px] z-[999]">
-                                            <p className="text-[10px] text-gray-800 whitespace-pre-wrap">{img.url}</p>
+                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/inlineImg:block z-[9999] pointer-events-none animate-in fade-in zoom-in duration-200">
+                                          <div className="bg-yellow-50 p-3 rounded-xl shadow-xl border border-yellow-300 min-w-[150px] max-w-[250px]">
+                                            <div className="text-[10px] font-bold text-yellow-800 mb-1 uppercase border-b border-yellow-200 pb-1">Ghi chú:</div>
+                                            <p className="text-[11px] text-gray-800 whitespace-pre-wrap leading-relaxed">{img.url}</p>
                                           </div>
                                         </div>
                                       )}
