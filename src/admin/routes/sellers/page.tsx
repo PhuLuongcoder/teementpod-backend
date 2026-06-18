@@ -80,6 +80,7 @@ export default function SellersAdminPage() {
   const [isSelectAllPages, setIsSelectAllPages] = useState(false)
   // === STATE QUẢN LÝ BỘ LỌC ===
   const [activeTab, setActiveTab] = useState('pending')
+  const [trackingFilter, setTrackingFilter] = useState('all')
   const [selectedShopId, setSelectedShopId] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [startDate, setStartDate] = useState('')
@@ -162,6 +163,9 @@ export default function SellersAdminPage() {
       } else {
         if (searchQuery) params.append('search', searchQuery);
         if (activeTab !== 'all') params.append('status', activeTab);
+        if (activeTab === 'in_transit' && trackingFilter !== 'all') {
+          params.append('has_tracking', trackingFilter === 'has_tracking' ? 'true' : 'false');
+        }
       }
 
       const [sellersRes, ordersRes] = await Promise.all([
@@ -178,7 +182,7 @@ export default function SellersAdminPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [selectedShopId, selectedSellerId, searchQuery, startDate, endDate, activeTab])
+  }, [selectedShopId, selectedSellerId, searchQuery, startDate, endDate, activeTab, trackingFilter])
 
   const handleAdminToggleShop = async (shop: any) => {
     if(!confirm(`Xác nhận ${shop.is_active !== false ? 'khóa' : 'mở khóa'} shop: ${shop.name}?`)) return;
@@ -248,6 +252,7 @@ export default function SellersAdminPage() {
     setEndDate('');
     setCurrentPage(1);
     setSelectedIds([]);
+    setTrackingFilter('all');
   }
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -733,7 +738,21 @@ export default function SellersAdminPage() {
             className="border p-2 rounded text-sm outline-none focus:border-blue-500"
           />
         </div>
-
+        {/* NÚT LỌC TRACKING CHỈ HIỆN Ở TAB IN TRANSIT */}
+        {activeTab === 'in_transit' && (
+          <div className="flex flex-col gap-y-1">
+            <label className="text-[10px] font-bold text-orange-600 uppercase">Lọc Tracking</label>
+            <select 
+              value={trackingFilter} 
+              onChange={(e) => {setTrackingFilter(e.target.value); setCurrentPage(1);}}
+              className="border border-orange-200 bg-orange-50/50 p-2 rounded text-sm min-w-[130px] outline-none focus:border-orange-500 font-medium text-orange-900"
+            >
+              <option value="all">Tất cả đơn</option>
+              <option value="has_tracking">✅ Đã có mã</option>
+              <option value="no_tracking">❌ Chưa có mã</option>
+            </select>
+          </div>
+        )}
         <div className="flex flex-col gap-y-1">
           <label className="text-[10px] font-bold text-gray-400 uppercase">Từ ngày</label>
           <input 
