@@ -26,12 +26,13 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
 
     // --- BẮT ĐẦU: LOGIC LỌC ĐƠN CÓ/CHƯA CÓ TRACKING ---
     if (status === 'in_transit' && has_tracking && has_tracking !== 'all') {
-      if (has_tracking === 'has_tracking') {
-        // ✅ Đã có mã: Tracking không được là null và không được là chuỗi rỗng
-        filters.tracking_number = { $nin: [null, ""] };
-      } else if (has_tracking === 'no_tracking') {
-        // ❌ Chưa có mã: Tracking bị null hoặc là chuỗi rỗng
-        filters.tracking_number = { $in: [null, ""] };
+      if (has_tracking === 'true') {
+        // ✅ Đã có mã: Ép Database tìm các đơn có tracking_number KHÁC null
+        // (Dùng $not của TypeORM/Medusa)
+        filters.tracking_number = { $not: null }; 
+      } else if (has_tracking === 'false') {
+        // ❌ Chưa có mã: Tìm các đơn bị bỏ trống Tracking
+        filters.tracking_number = null; 
       }
     }
     // --- KẾT THÚC ---
