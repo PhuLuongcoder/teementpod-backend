@@ -1483,23 +1483,37 @@ export default function SellersAdminPage() {
                   <div className="grid grid-cols-1 gap-3">
                     {viewingOrder.items && viewingOrder.items.length > 0 ? (
                       viewingOrder.items.map((item: any, idx: number) => (
-                        <div key={idx} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-100">
-                          <div className="flex items-center gap-4">
-                            <div className="bg-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs">
-                              {item.quantity || 1}
-                            </div>
-                            <div>
-                              <Text className="font-bold text-gray-900">{item.type}</Text>
-                              <div className="flex gap-3 mt-1">
-                                <Badge size="small" className="bg-white border text-gray-600">Màu: {item.color || 'N/A'}</Badge>
-                                <Badge size="small" className="bg-white border text-gray-600">Size: {item.size || 'N/A'}</Badge>
+                        <div key={idx} className="flex flex-col gap-3 p-4 bg-gray-50 rounded-lg border border-gray-100">
+                          
+                          {/* DÒNG TRÊN: THÔNG TIN SẢN PHẨM & LINK */}
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-center gap-4">
+                              <div className="bg-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shrink-0">
+                                {item.quantity || 1}
+                              </div>
+                              <div>
+                                <Text className="font-bold text-gray-900">{item.type}</Text>
+                                <div className="flex gap-3 mt-1">
+                                  <Badge size="small" className="bg-white border text-gray-600">Màu: {item.color || 'N/A'}</Badge>
+                                  <Badge size="small" className="bg-white border text-gray-600">Size: {item.size || 'N/A'}</Badge>
+                                </div>
                               </div>
                             </div>
+                            
+                            <div className="text-right flex flex-col gap-1 shrink-0">
+                               {item.design_front && <a href={item.design_front} target="_blank" rel="noreferrer" className="text-[10px] text-blue-600 hover:underline">Link Design Front</a>}
+                               {item.design_back && <a href={item.design_back} target="_blank" rel="noreferrer" className="text-[10px] text-blue-600 hover:underline">Link Design Back</a>}
+                            </div>
                           </div>
-                          <div className="text-right flex flex-col gap-1">
-                             {item.design_front && <a href={item.design_front} target="_blank" className="text-[10px] text-blue-600 hover:underline">Link Design Front</a>}
-                             {item.design_back && <a href={item.design_back} target="_blank" className="text-[10px] text-blue-600 hover:underline">Link Design Back</a>}
-                          </div>
+
+                          {/* DÒNG DƯỚI: GHI CHÚ RIÊNG CHO SẢN PHẨM (Nằm full width) */}
+                          {item.note && (
+                            <div className="bg-yellow-50 border border-yellow-200 p-2.5 rounded-lg text-xs text-yellow-800 flex gap-2 items-start w-full mt-1 shadow-sm">
+                              <span className="shrink-0 text-sm">📝</span>
+                              <span className="font-medium whitespace-pre-wrap leading-relaxed">{item.note}</span>
+                            </div>
+                          )}
+                          
                         </div>
                       ))
                     ) : (
