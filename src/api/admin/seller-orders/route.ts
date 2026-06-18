@@ -16,12 +16,25 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
     const skip = limit >= 999999 ? 0 : (page - 1) * limit;
     // --- KẾT THÚC SỬA ---
 
-    const { shop_id, seller_id, search, startDate, endDate, status } = req.query as any;
+    // 💡 LẤY THÊM BIẾN has_tracking TỪ TRÌNH DUYỆT GỬI LÊN
+    const { shop_id, seller_id, search, startDate, endDate, status, has_tracking } = req.query as any;
     let filters: any = {};
 
     if (shop_id) filters.shop_id = shop_id;
     if (status && status !== 'all') filters.status = status;
     if (search) filters.external_order_id = { $ilike: `%${search}%` };
+
+    // --- BẮT ĐẦU: LOGIC LỌC ĐƠN CÓ/CHƯA CÓ TRACKING ---
+    if (status === 'in_transit' && has_tracking && has_tracking !== 'all') {
+      if (has_tracking === 'has_tracking') {
+        // ✅ Đã có mã: Tracking không được là null và không được là chuỗi rỗng
+        filters.tracking_number = { $nin: [null, ""] };
+      } else if (has_tracking === 'no_tracking') {
+        // ❌ Chưa có mã: Tracking bị null hoặc là chuỗi rỗng
+        filters.tracking_number = { $in: [null, ""] };
+      }
+    }
+    // --- KẾT THÚC ---
 
     if (startDate || endDate) {
       filters.order_date = {};
