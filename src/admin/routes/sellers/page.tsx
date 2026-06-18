@@ -128,7 +128,48 @@ export default function SellersAdminPage() {
   const [trackingData, setTrackingData] = useState<any[]>([])
   const [isImportingTracking, setIsImportingTracking] = useState(false)
   const [trackingMessage, setTrackingMessage] = useState('')
-
+  const [updatingTrackingIds, setUpdatingTrackingIds] = useState<string[]>([]);
+  const handleUpdateInlineTracking = async (order: any, newTracking: string) => {
+    // Nếu gõ giống y cũ hoặc bỏ trống thì thôi, không gọi API
+    if (!newTracking || newTracking.trim() === (order.tracking_number || "")) return;
+    
+    setUpdatingTrackingIds(prev => [...prev, order.id]);
+    try {
+      // Tận dụng lại chính API Bulk Tracking của bác để nó tự chuyển status sang In Transit
+      const payload = [{
+        external_order_id: order.external_order_id,
+        tracking_number: newTracking.trim(),
+        carrier: order.shipping_carrier || 'USPS'
+      }];
+      
+      const res = await fetch('/admin/seller-orders/tracking/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tracking_data: payload })
+      });
+      const data = await res.json();
+      
+      if (res.ok) {
+        // Cập nhật lại UI ngay lập tức cho mượt, không cần tải lại trang
+        setOrdersList(prev => prev.map(o => {
+          if (o.id === order.id) {
+            return { 
+              ...o, 
+              tracking_number: newTracking.trim(),
+              status: 'in_transit' // Ép status UI lên Đang giao
+            };
+          }
+          return o;
+        }));
+      } else {
+        alert(`Lỗi: ${data.message || 'Cập nhật tracking thất bại'}`);
+      }
+    } catch (error) {
+      alert("Đã xảy ra lỗi mạng khi cập nhật Tracking.");
+    } finally {
+      setUpdatingTrackingIds(prev => prev.filter(id => id !== order.id));
+    }
+  };
   // === STATE QUẢN LÝ RESHIP (BẢO HÀNH) ===
   const [isReshipModalOpen, setIsReshipModalOpen] = useState(false)
   const [reshipPolicy, setReshipPolicy] = useState<'free' | 'half' | 'full'>('free')
@@ -1164,13 +1205,41 @@ export default function SellersAdminPage() {
                       </td>
 
                       
-                      <td className="px-4 py-3 text-xs">
-                        {order.tracking_number ? (
-                          <div className="flex flex-col gap-1">
-                            <span className="font-bold text-orange-600">{order.tracking_number}</span>
-                            <span className="text-gray-400">{order.shipping_carrier || 'USPS'}</span>
+                      {/* CỘT NHẬP TRACKING INLINE */}
+                      <td className="px-4 py-3 text-xs" onClick={(e) => e.stopPropagation()}>
+                        {['processing', 'in_transit'].includes(activeTab) ? (
+                          <div className="relative flex flex-col gap-1 w-max">
+                            <input 
+                              type="text"
+                              defaultValue={order.tracking_number || ""}
+                              placeholder="Nhập mã Tracking..."
+                              className={clx(
+                                "border p-1.5 w-36 text-xs rounded outline-none focus:ring-2 focus:ring-orange-500 transition-all font-bold placeholder-gray-300",
+                                updatingTrackingIds.includes(order.id) ? "bg-gray-100 text-gray-400" : "bg-white text-orange-600 border-orange-200 focus:border-orange-500 hover:border-orange-300",
+                                !order.tracking_number && "border-dashed"
+                              )}
+                              onBlur={(e) => {
+                                const newVal = e.target.value.trim();
+                                if (newVal !== (order.tracking_number || "")) {
+                                  handleUpdateInlineTracking(order, newVal);
+                                }
+                              }}
+                              onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                              disabled={updatingTrackingIds.includes(order.id)}
+                            />
+                            {updatingTrackingIds.includes(order.id) && <Spinner className="w-3 h-3 absolute right-2 top-2 text-orange-600 animate-spin" />}
+                            {order.tracking_number && (
+                              <span className="text-[9px] text-gray-400 pl-1 font-medium">{order.shipping_carrier || 'USPS'}</span>
+                            )}
                           </div>
-                        ) : <span className="text-gray-400 italic">Chưa có</span>}
+                        ) : (
+                          order.tracking_number ? (
+                            <div className="flex flex-col gap-1">
+                              <span className="font-bold text-orange-600">{order.tracking_number}</span>
+                              <span className="text-gray-400 text-[10px]">{order.shipping_carrier || 'USPS'}</span>
+                            </div>
+                          ) : <span className="text-gray-400 italic">Chưa có</span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-right space-x-2" onClick={(e) => e.stopPropagation()}>
                         <button onClick={() => openDetail(order.id)} className="text-blue-600 font-semibold hover:underline mr-2">Chi tiết</button>
