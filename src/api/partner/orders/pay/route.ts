@@ -14,19 +14,13 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
 
     for (const id of order_ids) {
       const order = await sellerService.retrieveSellerOrder(id);
-      
+
       // Chỉ xử lý đơn hàng đang pending
       if (!order || order.status !== "pending") {
         continue;
       }
 
-      // 🛡️ CHỐT CHẶN 1: TỪ CHỐI ĐƠN 0 ĐỒNG HOẶC NULL
-      if (!order.order_price || order.order_price <= 0) {
-        failedOrders.push(`${order.external_order_id} (Lỗi: Đơn giá $0)`);
-        continue; // Bỏ qua đơn này, chuyển sang đơn tiếp theo
-      }
-
-      // 🛡️ CHỐT CHẶN 2: KIỂM TRA SẢN PHẨM BỊ RỖNG
+      // 🛡️ BƯỚC 1: Bóc tách giỏ hàng
       let items: any[] = [];
       try {
         if (order.items && Array.isArray(order.items) && order.items.length > 0) {
@@ -41,44 +35,64 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
         console.error("Lỗi parse items:", e);
       }
 
+      // 🛡️ LỚP THÉP 1: Chặn mảng rỗng
       if (!items || items.length === 0) {
-        failedOrders.push(`${order.external_order_id} (Lỗi: Đơn rỗng)`);
+        failedOrders.push(`${order.external_order_id} (Lỗi: Dữ liệu sản phẩm rỗng)`);
         continue;
       }
 
-      /* * 💡 CHÚ Ý QUAN TRỌNG: TRỪ TIỀN SELLER
-       * Bác bắt buộc phải thêm logic kiểm tra và trừ tiền ví (Wallet/Balance) của Seller ở đây!
-       * * Ví dụ giả lập:
-       * const seller = await sellerService.retrieveSeller(order.seller_id);
-       * if (seller.balance < order.order_price) {
-       * failedOrders.push(`${order.external_order_id} (Lỗi: Số dư không đủ)`);
-       * continue;
-       * }
-       * await sellerService.deductBalance(order.seller_id, order.order_price);
-       */
+      // 🛡️ LỚP THÉP 2: Quét nội soi từng sản phẩm (Chặn tuyệt đối lỗi 3 trường)
+      let isItemsValid = true;
+      for (const item of items) {
+        // Hàm .trim() sẽ gọt sạch các khoảng trắng (Space) nếu Seller cố tình lách luật
+        const type = (item.type || "").trim();
+        const color = (item.color || "").trim();
+        const size = (item.size || "").trim();
+        const front = (item.design_front || "").trim();
+        const back = (item.design_back || "").trim();
 
-      // Nếu vượt qua mọi bài test, tiến hành duyệt đơn!
+        // Rớt đài nếu thiếu 1 trong 3 trường, HOẶC thiếu cả 2 mặt thiết kế
+        if (!type || !color || !size || (!front && !back)) {
+          isItemsValid = false;
+          break;
+        }
+      }
+
+      if (!isItemsValid) {
+        failedOrders.push(`${order.external_order_id} (Lỗi: Chưa chọn đủ Phôi/Màu/Size hoặc thiếu Link Design)`);
+        continue;
+      }
+
+      // 🛡️ LỚP THÉP 3: Ép kiểu dữ liệu và chặn đơn $0
+      const price = Number(order.order_price || 0);
+      if (isNaN(price) || price <= 0) {
+        failedOrders.push(`${order.external_order_id} (Lỗi: Đơn giá $0 không hợp lệ)`);
+        continue;
+      }
+
+      // Nếu vượt qua 3 lớp thép trên -> Đơn chuẩn 100%, cho phép cập nhật!
       await sellerService.updateSellerOrders({
         id: order.id,
-        status: "complete" // Chuyển đổi trạng thái sau khi pay thành công
+        status: "complete" 
       });
       paidCount++;
     }
 
-    // Xử lý thông báo trả về cho Frontend
+    // --- TRẢ KẾT QUẢ CHO SELLER ---
     if (paidCount === 0) {
+      // Nếu tất cả đơn gửi lên đều là đơn 0Đ / lỗi
       return res.status(400).json({ 
-        error: `Giao dịch thất bại! Không có đơn nào hợp lệ để thanh toán.\nLý do: ${failedOrders.join(', ')}` 
+        error: `Giao dịch thất bại! Các đơn hàng chưa đủ điều kiện:\n\n- ${failedOrders.join('\n- ')}` 
       });
     }
 
     const warningMsg = failedOrders.length > 0 
-      ? `\n⚠️ Hệ thống đã từ chối ${failedOrders.length} đơn lỗi: ${failedOrders.join(', ')}` 
+      ? `\n\n⚠️ Hệ thống đã từ chối ${failedOrders.length} đơn lỗi:\n- ${failedOrders.join('\n- ')}` 
       : "";
 
     res.json({
       status: "success",
-      message: `Thanh toán thành công! Đã chuyển tiếp ${paidCount} đơn hàng sang hệ thống xử lý của Admin xưởng.${warningMsg}`
+      message: `Thanh toán thành công! Đã chuyển ${paidCount} đơn sang xưởng sản xuất.${warningMsg}`
     });
 
   } catch (error: any) {
