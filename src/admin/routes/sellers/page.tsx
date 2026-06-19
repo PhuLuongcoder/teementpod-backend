@@ -859,10 +859,16 @@ export default function SellersAdminPage() {
               </Button>
             )}
 
+            {/* NÚT TIẾN TRẠNG THÁI CHO TAB ĐANG GIAO HÀNG */}
             {activeTab === 'in_transit' && (
-              <Button variant="secondary" size="small" className="bg-green-600 border-none text-white hover:bg-green-700" 
-                onClick={() => handlePushStatus('done')} isLoading={isBulking}>
-                <CheckCircleSolid /> Cập nhật thành: Đã giao (Done)
+              <Button 
+                variant="secondary" 
+                size="small" 
+                className="bg-green-600 border-none text-white hover:bg-green-700 shadow-md" 
+                onClick={() => handlePushStatus('done')} 
+                isLoading={isBulking}
+              >
+                <CheckCircleSolid /> Chốt Hoàn thành (Done)
               </Button>
             )}
             
@@ -892,11 +898,29 @@ export default function SellersAdminPage() {
               </>
             )}
 
+            {/* CÁC NÚT TIẾN TRẠNG THÁI CHO TAB ĐANG SẢN XUẤT */}
             {activeTab === 'processing' && (
-              <Button variant="secondary" size="small" className="bg-orange-600 border-none text-white hover:bg-orange-700" 
-                onClick={() => handleBulkAction('unapprove')} isLoading={isBulking}>
-                <XCircleSolid /> Hủy Duyệt (về Chờ duyệt)
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="secondary" 
+                  size="small" 
+                  className="bg-orange-600 border-none text-white hover:bg-orange-700 shadow-md" 
+                  onClick={() => handlePushStatus('in_transit')} 
+                  isLoading={isBulking}
+                >
+                  <CheckCircleSolid /> Đẩy sang Đang giao
+                </Button>
+                
+                <Button 
+                  variant="secondary" 
+                  size="small" 
+                  className="bg-emerald-600 border-none text-white hover:bg-emerald-700 shadow-md" 
+                  onClick={() => handlePushStatus('done')} 
+                  isLoading={isBulking}
+                >
+                  <CheckCircleSolid /> Ép hoàn thành (Done)
+                </Button>
+              </div>
             )}
 
             {activeTab === 'cancelled' && (
