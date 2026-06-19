@@ -834,10 +834,28 @@ export default function SellersAdminPage() {
             </span>
           </div>
           <div className="flex gap-x-2 items-center">
-            {activeTab === 'processing' && (
-              <Button variant="secondary" size="small" className="bg-orange-600 border-none text-white hover:bg-orange-700" 
-                onClick={() => handlePushStatus('in_transit')} isLoading={isBulking}>
-                <CheckCircleSolid /> Cập nhật thành: Đang giao (In Transit)
+            {/* NÚT TRẢ TRẠNG THÁI LÙI (DÙNG CHUNG CHO 3 TAB) */}
+            {['done', 'in_transit', 'processing'].includes(activeTab) && (
+              <Button 
+                variant="secondary" 
+                size="small" 
+                className="bg-gray-700 border-none text-white hover:bg-gray-800 shadow-md" 
+                onClick={() => {
+                  // Cấu hình chuỗi lùi trạng thái
+                  const revertMap: Record<string, string> = {
+                    'done': 'in_transit',        // Hoàn thành -> Đang giao
+                    'in_transit': 'processing',  // Đang giao -> Đang sản xuất
+                    'processing': 'complete'     // Đang sản xuất -> Chờ duyệt
+                  };
+                  
+                  const prevStatus = revertMap[activeTab];
+                  if (prevStatus) {
+                    handlePushStatus(prevStatus);
+                  }
+                }} 
+                isLoading={isBulking}
+              >
+                <ArrowUturnLeft /> Trả lại trạng thái trước
               </Button>
             )}
 
