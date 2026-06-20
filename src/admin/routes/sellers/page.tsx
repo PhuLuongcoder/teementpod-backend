@@ -193,6 +193,7 @@ export default function SellersAdminPage() {
     try {
       const params = new URLSearchParams({
         page: page.toString(),
+        limit: "50",
         seller_id: selectedSellerId,
         shop_id: selectedShopId,
         startDate: startDate,
@@ -1112,6 +1113,7 @@ export default function SellersAdminPage() {
                   <th className="px-4 py-3 font-semibold text-center">Thiết kế</th>
                   <th className="px-4 py-3 font-semibold">Nhà In</th>
                   <th className="px-4 py-3 font-semibold">Tracking</th>
+                  <th className="px-4 py-3 font-semibold text-right">Giá</th>
                   <th className="px-4 py-3 font-semibold text-right">Thao tác</th>
                 </tr>
               </thead>
@@ -1282,6 +1284,11 @@ export default function SellersAdminPage() {
                             </div>
                           ) : <span className="text-gray-400 italic">Chưa có</span>
                         )}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="font-extrabold text-green-600 bg-green-50 px-2 py-1.5 rounded-md inline-block border border-green-200/60 shadow-sm">
+                          ${order.order_price || 0}
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-right space-x-2" onClick={(e) => e.stopPropagation()}>
                         <button onClick={() => openDetail(order.id)} className="text-blue-600 font-semibold hover:underline mr-2">Chi tiết</button>
