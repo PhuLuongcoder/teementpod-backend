@@ -181,9 +181,19 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     const formattedOrders: any[] = rawOrders.map((order: any) => {
       let parsedAddress: any = {};
       try {
-        parsedAddress = typeof order.shipping_address === 'string' && order.shipping_address.includes('{') 
-          ? JSON.parse(order.shipping_address) 
-          : { raw: order.shipping_address };
+        if (typeof order.shipping_address === 'string') {
+          parsedAddress = order.shipping_address.includes('{') 
+            ? JSON.parse(order.shipping_address) 
+            : { raw: order.shipping_address };
+        } else if (typeof order.shipping_address === 'object' && order.shipping_address !== null) {
+          // Dữ liệu đã là Object chuẩn từ Frontend gửi lên
+          parsedAddress = order.shipping_address;
+          
+          // Thuật toán "bóc vỏ hành": Tự động dọn dẹp các lớp "raw" lồng nhau do lỗi cũ
+          while (parsedAddress.raw && typeof parsedAddress.raw === 'object') {
+            parsedAddress = parsedAddress.raw;
+          }
+        }
       } catch (e) { parsedAddress = { raw: order.shipping_address }; }
 
       let parsedItems = [];
@@ -339,15 +349,14 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     const skippedOrderIds: string[] = [];
 
     for (const orderData of formattedOrders) {
-      orderData.product_detail = orderData.items;
+      
+      // >>> SỬA TẠI ĐÂY: Trả lại JSON.stringify vì Database của bạn dùng cột String (Text) <<<
+      orderData.product_detail = JSON.stringify(orderData.items);
 
       if (existingOrderMap.has(orderData.external_order_id)) {
         // --- NẾU ĐƠN HÀNG ĐÃ TỒN TẠI -> THỰC HIỆN UPDATE ---
         const internalOrderId = existingOrderMap.get(orderData.external_order_id);
-        
-        // Cập nhật: Bổ sung "items" vào để triệt tiêu nó khỏi updatePayload, tránh DB báo lỗi relation
         const { order_date, created_at, updated_at, status, items, ...updatePayload } = orderData; 
-        
         try {
           await sellerService.updateSellerOrders({
             id: internalOrderId,
@@ -359,7 +368,6 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
           skippedOrderIds.push(orderData.external_order_id);
         }
       } else {
-        // Cập nhật: Loại bỏ mảng ảo "items" trước khi tạo mới để tránh lỗi
         const { items, ...createPayload } = orderData;
         await sellerService.createSellerOrders(createPayload);
         createdCount++;
