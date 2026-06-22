@@ -356,15 +356,18 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
       if (orderData.items && orderData.items.length > 0) {
         const firstItem = orderData.items[0];
 
+        // Đồng bộ Link Design
         orderData.design_front_url = firstItem.design_front || orderData.design_front_url;
         orderData.design_back_url = firstItem.design_back || orderData.design_back_url;
 
+        // Đồng bộ Mockup
         if (firstItem.mockup) {
           orderData.mockup_urls = typeof orderData.mockup_urls === 'object' && orderData.mockup_urls
             ? { ...orderData.mockup_urls, default: firstItem.mockup }
             : { default: firstItem.mockup };
         }
 
+        // Đồng bộ Phôi, Màu, Size, SKU
         orderData.product_type = orderData.items.length > 1 
           ? `${firstItem.type} (+${orderData.items.length - 1} món khác)` 
           : (firstItem.type || orderData.product_type);
@@ -375,18 +378,19 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
       }
 
       // =====================================================================
-      // 2. ÉP CHUỖI JSON: CHỐNG SẬP DATABASE (CRASH) KHI LƯU
+      // 2. ÉP KIỂU MẢNG CHO CỘT JSONB (SỬA LỖI CRASH DATABASE)
       // =====================================================================
-      orderData.product_detail = JSON.stringify(orderData.items);
+      // Tuyệt đối không dùng JSON.stringify. TypeORM sẽ tự động map Array vào cột jsonb.
+      orderData.product_detail = orderData.items;
 
       if (existingOrderMap.has(orderData.external_order_id)) {
         // --- NẾU ĐƠN HÀNG ĐÃ TỒN TẠI -> THỰC HIỆN UPDATE ---
         const internalOrderId = existingOrderMap.get(orderData.external_order_id);
         
-        // 3. FIX LỖI "ĐÃ TỒN TẠI ID": Gỡ external_order_id ra khỏi lệnh Update
+        // 3. FIX LỖI XUNG ĐỘT: Gỡ bỏ external_order_id và mảng ảo items ra khỏi Update Payload
         const { 
           order_date, created_at, updated_at, status, items, 
-          external_order_id, // Lọc bỏ trường này để DB không bắt lỗi Unique Constraint
+          external_order_id, id, // Bỏ qua các trường nhạy cảm để không bị DB chặn
           ...updatePayload 
         } = orderData; 
         
@@ -401,8 +405,8 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
           skippedOrderIds.push(orderData.external_order_id);
         }
       } else {
-        // Loại bỏ mảng ảo "items" trước khi tạo mới để tránh lỗi
-        const { items, ...createPayload } = orderData;
+        // Lọc bỏ id và mảng ảo items khi tạo mới
+        const { items, id, ...createPayload } = orderData;
         await sellerService.createSellerOrders(createPayload);
         createdCount++;
       }
