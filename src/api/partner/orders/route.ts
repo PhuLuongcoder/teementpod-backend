@@ -205,7 +205,6 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
         shipping_address: parsedAddress,
         product_type: order.product_type || "Unknown Product",
         items: parsedItems, 
-        product_detail: JSON.stringify(parsedItems),
         design_front_url: order.design_front_url || null,
         design_back_url: order.design_back_url || null,
         mockup_urls: order.mockup_urls || null,
@@ -340,10 +339,17 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     const skippedOrderIds: string[] = [];
 
     for (const orderData of formattedOrders) {
+      
+      // >>> THÊM MỚI TẠI ĐÂY: Chỉ đóng gói JSON khi mọi thông tin Design, Price đã được lấp đầy <<<
+      orderData.product_detail = JSON.stringify(orderData.items);
+
       if (existingOrderMap.has(orderData.external_order_id)) {
         // --- NẾU ĐƠN HÀNG ĐÃ TỒN TẠI -> THỰC HIỆN UPDATE ---
         const internalOrderId = existingOrderMap.get(orderData.external_order_id);
-        const { order_date, created_at, updated_at, status, ...updatePayload } = orderData;
+        
+        // Cập nhật: Bổ sung "items" vào để triệt tiêu nó khỏi updatePayload, tránh DB báo lỗi relation
+        const { order_date, created_at, updated_at, status, items, ...updatePayload } = orderData; 
+        
         try {
           await sellerService.updateSellerOrders({
             id: internalOrderId,
@@ -355,7 +361,9 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
           skippedOrderIds.push(orderData.external_order_id);
         }
       } else {
-        await sellerService.createSellerOrders(orderData);
+        // Cập nhật: Loại bỏ mảng ảo "items" trước khi tạo mới để tránh lỗi
+        const { items, ...createPayload } = orderData;
+        await sellerService.createSellerOrders(createPayload);
         createdCount++;
       }
     }
