@@ -28,18 +28,9 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
     }
 
     // --- 2. KHỐI BẢO MẬT: KIỂM TRA QUYỀN SỞ HỮU SHOP ---
-    const currentShopInfo = await sellerService.listShops({ id: shop_id });
-    
-    if (currentShopInfo.length === 0) {
-      return res.status(404).json({ error: "Không tìm thấy cửa hàng này!" });
-    }
-
-    if (currentShopInfo[0].seller_id !== currentSellerId) {
-      return res.status(403).json({ 
-        error: "Forbidden: Rò rỉ dữ liệu bị chặn! Bạn không có quyền xem đơn hàng của shop này." 
-      });
-    }
-    // -----------------------------------------------------
+    // --- 2. KHỐI BẢO MẬT: LẤY TẤT CẢ SHOP THUỘC QUYỀN QUẢN LÝ ---
+    const sellerShops = await sellerService.listShops({ seller_id: currentSellerId });
+    const sellerShopIds = sellerShops.map((s: any) => s.id);
 
     const search = req.query.search as string;
     const startDate = req.query.startDate as string;
@@ -50,7 +41,24 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
     const limit = 10;
     const skip = (page - 1) * limit;
 
-    let filters: any = { shop_id: shop_id };
+    let filters: any = {};
+    
+    if (search) {
+      // Khi có từ khóa tìm kiếm (Mã Đơn), quét qua toàn bộ shop thuộc quyền quản lý của seller này
+      filters.shop_id = sellerShopIds;
+      filters.external_order_id = { $ilike: `%${search}%` };
+    } else {
+      // Khi không tìm kiếm, giữ nguyên logic bắt buộc truyền shop_id cụ thể và bảo mật như cũ
+      if (!shop_id) {
+         return res.status(400).json({ error: "Thiếu thông tin Cửa hàng (shop_id)." });
+      }
+      if (!sellerShopIds.includes(shop_id)) {
+        return res.status(403).json({ 
+          error: "Forbidden: Rò rỉ dữ liệu bị chặn! Bạn không có quyền xem đơn hàng của shop này." 
+        });
+      }
+      filters.shop_id = shop_id;
+    }
     
     if (status && status !== 'all') {
       filters.status = status;
@@ -83,11 +91,15 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
     const sellers = await sellerService.listSellers({ id: currentSellerId });
     const perOrderFee = sellers.length > 0 ? Number(sellers[0].per_order_fee || 0) : 0;
 
-    const modifiedOrders = orders.map((order: any) => ({
-      ...order,
-      // Trừ đi phí xử lý đơn để hiển thị giá gốc (không cho kết quả âm)
-      order_price: Math.max(0, Number(order.order_price || 0) - perOrderFee)
-    }));
+    const modifiedOrders = orders.map((order: any) => {
+      const matchingShop = sellerShops.find((s: any) => s.id === order.shop_id);
+      return {
+        ...order,
+        shop_name: matchingShop ? matchingShop.name : "Cửa hàng ẩn", // Thêm tên shop vào dữ liệu đơn
+        // Trừ đi phí xử lý đơn để hiển thị giá gốc (không cho kết quả âm)
+        order_price: Math.max(0, Number(order.order_price || 0) - perOrderFee)
+      };
+    });
 
     res.json({
       status: "success",
