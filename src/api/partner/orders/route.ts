@@ -339,9 +339,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     const skippedOrderIds: string[] = [];
 
     for (const orderData of formattedOrders) {
-      
-      // >>> THÊM MỚI TẠI ĐÂY: Chỉ đóng gói JSON khi mọi thông tin Design, Price đã được lấp đầy <<<
-      orderData.product_detail = JSON.stringify(orderData.items);
+      orderData.product_detail = orderData.items;
 
       if (existingOrderMap.has(orderData.external_order_id)) {
         // --- NẾU ĐƠN HÀNG ĐÃ TỒN TẠI -> THỰC HIỆN UPDATE ---
