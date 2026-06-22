@@ -193,6 +193,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
         shipping_address: parsedAddress,
         product_type: order.product_type || "Unknown Product",
         items: parsedItems, 
+        product_detail: JSON.stringify(parsedItems),
         design_front_url: order.design_front_url || null,
         design_back_url: order.design_back_url || null,
         mockup_urls: order.mockup_urls || null,
@@ -306,7 +307,8 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
       // Gán vào đơn hàng
       orderData.shipping_cost = totalShippingCost; 
       // VẪN GIỮ NGUYÊN PHÍ PER ORDER Ở ĐÂY ĐỂ LƯU VÀO DATABASE CHO ADMIN THẤY
-      orderData.order_price = totalCalculatedPrice + totalShippingCost + perOrderFee; 
+      const calculatedPrice = totalCalculatedPrice + totalShippingCost + perOrderFee;
+      orderData.order_price = calculatedPrice > perOrderFee ? calculatedPrice : (orderData.order_price || 0);
     }
 
     const extractedIds = formattedOrders.map((o: any) => o.external_order_id);
