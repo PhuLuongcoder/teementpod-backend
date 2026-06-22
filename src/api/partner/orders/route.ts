@@ -27,7 +27,6 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
        return res.status(400).json({ error: "Thiếu thông tin Cửa hàng (shop_id)." });
     }
 
-    // --- 2. KHỐI BẢO MẬT: KIỂM TRA QUYỀN SỞ HỮU SHOP ---
     // --- 2. KHỐI BẢO MẬT: LẤY TẤT CẢ SHOP THUỘC QUYỀN QUẢN LÝ ---
     const sellerShops = await sellerService.listShops({ seller_id: currentSellerId });
     const sellerShopIds = sellerShops.map((s: any) => s.id);
@@ -64,10 +63,6 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
       filters.status = status;
     }
     
-    if (search) {
-      filters.external_order_id = { $ilike: `%${search}%` };
-    }
-    
     if (startDate || endDate) {
       filters.order_date = {};
       if (startDate) {
@@ -86,7 +81,7 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
     );
 
     // =======================================================================
-    // MỚI: LẤY THÔNG TIN SELLER ĐỂ LẤY PHÍ ẨN VÀ TRỪ RA TRƯỚC KHI GỬI CHO SELLER
+    // LẤY THÔNG TIN SELLER ĐỂ LẤY PHÍ ẨN VÀ TRỪ RA TRƯỚC KHI GỬI CHO SELLER
     // =======================================================================
     const sellers = await sellerService.listSellers({ id: currentSellerId });
     const perOrderFee = sellers.length > 0 ? Number(sellers[0].per_order_fee || 0) : 0;
@@ -103,7 +98,7 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
 
     res.json({
       status: "success",
-      orders: modifiedOrders, // Trả về mảng đơn hàng đã được giấu phí
+      orders: modifiedOrders, 
       count,
       totalPages: Math.ceil(count / limit),
       currentPage: page
@@ -212,7 +207,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
         customer_phone: order.customer_phone || null,
         shipping_address: parsedAddress,
         
-        // >>> ĐÃ THÊM: Khởi tạo các trường gốc để Admin đọc được <<<
+        // Khởi tạo các trường gốc để Admin đọc được
         product_type: order.product_type || "Unknown Product",
         sku: order.sku || null,
         color: order.color || null,
@@ -355,7 +350,9 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
 
     for (const orderData of formattedOrders) {
       
-      // >>> ĐÃ THÊM: Đồng bộ ngược từ items ra trường gốc trước khi lưu <<<
+      // =====================================================================
+      // 1. ĐỒNG BỘ NGƯỢC (MAPPING): ĐẨY DỮ LIỆU RA NGOÀI CHO ADMIN ĐỌC ĐƯỢC
+      // =====================================================================
       if (orderData.items && orderData.items.length > 0) {
         const firstItem = orderData.items[0];
 
@@ -377,15 +374,21 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
         orderData.quantity = firstItem.quantity || orderData.quantity;
       }
 
-      // >>> ĐÃ SỬA: Đóng gói JSON.stringify vì Database dùng cột String <<<
+      // =====================================================================
+      // 2. ÉP CHUỖI JSON: CHỐNG SẬP DATABASE (CRASH) KHI LƯU
+      // =====================================================================
       orderData.product_detail = JSON.stringify(orderData.items);
 
       if (existingOrderMap.has(orderData.external_order_id)) {
         // --- NẾU ĐƠN HÀNG ĐÃ TỒN TẠI -> THỰC HIỆN UPDATE ---
         const internalOrderId = existingOrderMap.get(orderData.external_order_id);
         
-        // Bổ sung "items" vào để triệt tiêu nó khỏi updatePayload, tránh DB báo lỗi relation
-        const { order_date, created_at, updated_at, status, items, ...updatePayload } = orderData; 
+        // 3. FIX LỖI "ĐÃ TỒN TẠI ID": Gỡ external_order_id ra khỏi lệnh Update
+        const { 
+          order_date, created_at, updated_at, status, items, 
+          external_order_id, // Lọc bỏ trường này để DB không bắt lỗi Unique Constraint
+          ...updatePayload 
+        } = orderData; 
         
         try {
           await sellerService.updateSellerOrders({
