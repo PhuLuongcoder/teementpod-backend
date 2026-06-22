@@ -186,10 +186,8 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
             ? JSON.parse(order.shipping_address) 
             : { raw: order.shipping_address };
         } else if (typeof order.shipping_address === 'object' && order.shipping_address !== null) {
-          // Dữ liệu đã là Object chuẩn từ Frontend gửi lên
+          // Thuật toán "bóc vỏ hành": Dọn dẹp các lớp "raw" lồng nhau
           parsedAddress = order.shipping_address;
-          
-          // Thuật toán "bóc vỏ hành": Tự động dọn dẹp các lớp "raw" lồng nhau do lỗi cũ
           while (parsedAddress.raw && typeof parsedAddress.raw === 'object') {
             parsedAddress = parsedAddress.raw;
           }
@@ -213,7 +211,14 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
         customer_email: order.customer_email || null,
         customer_phone: order.customer_phone || null,
         shipping_address: parsedAddress,
+        
+        // >>> ĐÃ THÊM: Khởi tạo các trường gốc để Admin đọc được <<<
         product_type: order.product_type || "Unknown Product",
+        sku: order.sku || null,
+        color: order.color || null,
+        size: order.size || null,
+        quantity: order.quantity || 1,
+
         items: parsedItems, 
         design_front_url: order.design_front_url || null,
         design_back_url: order.design_back_url || null,
@@ -350,13 +355,38 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
 
     for (const orderData of formattedOrders) {
       
-      // >>> SỬA TẠI ĐÂY: Trả lại JSON.stringify vì Database của bạn dùng cột String (Text) <<<
+      // >>> ĐÃ THÊM: Đồng bộ ngược từ items ra trường gốc trước khi lưu <<<
+      if (orderData.items && orderData.items.length > 0) {
+        const firstItem = orderData.items[0];
+
+        orderData.design_front_url = firstItem.design_front || orderData.design_front_url;
+        orderData.design_back_url = firstItem.design_back || orderData.design_back_url;
+
+        if (firstItem.mockup) {
+          orderData.mockup_urls = typeof orderData.mockup_urls === 'object' && orderData.mockup_urls
+            ? { ...orderData.mockup_urls, default: firstItem.mockup }
+            : { default: firstItem.mockup };
+        }
+
+        orderData.product_type = orderData.items.length > 1 
+          ? `${firstItem.type} (+${orderData.items.length - 1} món khác)` 
+          : (firstItem.type || orderData.product_type);
+        orderData.sku = firstItem.sku || orderData.sku;
+        orderData.color = firstItem.color || orderData.color;
+        orderData.size = firstItem.size || orderData.size;
+        orderData.quantity = firstItem.quantity || orderData.quantity;
+      }
+
+      // >>> ĐÃ SỬA: Đóng gói JSON.stringify vì Database dùng cột String <<<
       orderData.product_detail = JSON.stringify(orderData.items);
 
       if (existingOrderMap.has(orderData.external_order_id)) {
         // --- NẾU ĐƠN HÀNG ĐÃ TỒN TẠI -> THỰC HIỆN UPDATE ---
         const internalOrderId = existingOrderMap.get(orderData.external_order_id);
+        
+        // Bổ sung "items" vào để triệt tiêu nó khỏi updatePayload, tránh DB báo lỗi relation
         const { order_date, created_at, updated_at, status, items, ...updatePayload } = orderData; 
+        
         try {
           await sellerService.updateSellerOrders({
             id: internalOrderId,
@@ -368,6 +398,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
           skippedOrderIds.push(orderData.external_order_id);
         }
       } else {
+        // Loại bỏ mảng ảo "items" trước khi tạo mới để tránh lỗi
         const { items, ...createPayload } = orderData;
         await sellerService.createSellerOrders(createPayload);
         createdCount++;
