@@ -43,11 +43,9 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
     let filters: any = {};
     
     if (search) {
-      // Khi có từ khóa tìm kiếm (Mã Đơn), quét qua toàn bộ shop thuộc quyền quản lý của seller này
       filters.shop_id = sellerShopIds;
       filters.external_order_id = { $ilike: `%${search}%` };
     } else {
-      // Khi không tìm kiếm, giữ nguyên logic bắt buộc truyền shop_id cụ thể và bảo mật như cũ
       if (!shop_id) {
          return res.status(400).json({ error: "Thiếu thông tin Cửa hàng (shop_id)." });
       }
@@ -90,8 +88,7 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
       const matchingShop = sellerShops.find((s: any) => s.id === order.shop_id);
       return {
         ...order,
-        shop_name: matchingShop ? matchingShop.name : "Cửa hàng ẩn", // Thêm tên shop vào dữ liệu đơn
-        // Trừ đi phí xử lý đơn để hiển thị giá gốc (không cho kết quả âm)
+        shop_name: matchingShop ? matchingShop.name : "Cửa hàng ẩn",
         order_price: Math.max(0, Number(order.order_price || 0) - perOrderFee)
       };
     });
@@ -112,7 +109,6 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
   try {
     const sellerService = req.scope.resolve("sellerModuleService")
     
-    // --- 1. KHỐI BẢO MẬT: TỰ GIẢI MÃ TOKEN ---
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return res.status(401).json({ error: "Truy cập bị từ chối: Vui lòng đăng nhập lại!" });
@@ -126,7 +122,6 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     } catch (err) {
       return res.status(401).json({ error: "Token hết hạn hoặc không hợp lệ!" });
     }
-    // ------------------------------------------
 
     const body = req.body as { orders: any[], target_shop_id: string }
     const { orders: rawOrders, target_shop_id } = body;
@@ -139,7 +134,6 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
       return res.status(400).json({ error: "Không có dữ liệu đơn hàng nào được gửi lên." })
     }
 
-    // --- 2. KHỐI BẢO MẬT: KIỂM TRA QUYỀN SỞ HỮU SHOP TRƯỚC KHI IMPORT ---
     let markupFee = 0;
     let perOrderFee = 0;
     const currentShopInfo = await sellerService.listShops(
@@ -153,7 +147,6 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
 
     const targetShop = currentShopInfo[0];
 
-    // CHỐT CHẶN RÒ RỈ DỮ LIỆU CHÉO (CROSS-TENANT LEAKAGE)
     if (targetShop.seller_id !== currentSellerId) {
        return res.status(403).json({ 
          error: "Forbidden: Bạn đang cố import đơn hàng vào Cửa hàng của người khác! Hành động đã bị chặn." 
@@ -170,18 +163,17 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
       markupFee = targetShop.seller.markup_fee || 0;
       perOrderFee = Number(targetShop.seller.per_order_fee || 0);
     }
-    // -------------------------------------------------------------------
 
     // 3. SƠ CHẾ VÀ GÁN ĐÚNG SHOP_ID MÀ SELLER ĐÃ CHỌN
     const formattedOrders: any[] = rawOrders.map((order: any) => {
       let parsedAddress: any = {};
       try {
+        // Thuật toán Bóc Vỏ Hành: Chữa dứt điểm lỗi lặp 'raw' lồng nhau
         if (typeof order.shipping_address === 'string') {
           parsedAddress = order.shipping_address.includes('{') 
             ? JSON.parse(order.shipping_address) 
             : { raw: order.shipping_address };
         } else if (typeof order.shipping_address === 'object' && order.shipping_address !== null) {
-          // Thuật toán "bóc vỏ hành": Dọn dẹp các lớp "raw" lồng nhau
           parsedAddress = order.shipping_address;
           while (parsedAddress.raw && typeof parsedAddress.raw === 'object') {
             parsedAddress = parsedAddress.raw;
@@ -191,10 +183,12 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
 
       let parsedItems = [];
       try {
-        if (order.product_detail) {
-           parsedItems = typeof order.product_detail === 'string' ? JSON.parse(order.product_detail) : order.product_detail;
-        } else if (order.items) {
+        // Đồng bộ dữ liệu items từ product_detail (nếu có)
+        if (order.items && Array.isArray(order.items)) {
            parsedItems = order.items;
+        } else if (order.product_detail) {
+           parsedItems = typeof order.product_detail === 'string' ? JSON.parse(order.product_detail) : order.product_detail;
+           if (!Array.isArray(parsedItems)) parsedItems = [parsedItems];
         }
       } catch(e) {}
 
@@ -207,17 +201,14 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
         customer_phone: order.customer_phone || null,
         shipping_address: parsedAddress,
         
-        // Khởi tạo các trường gốc để Admin đọc được
         product_type: order.product_type || "Unknown Product",
-        sku: order.sku || null,
-        color: order.color || null,
-        size: order.size || null,
-        quantity: order.quantity || 1,
-
+        
+        // >>> SỬA LỖI 1: Gán mảng trực tiếp vào items (Bảng SellerOrder định nghĩa items là json)
         items: parsedItems, 
+        
         design_front_url: order.design_front_url || null,
         design_back_url: order.design_back_url || null,
-        mockup_urls: order.mockup_urls || null,
+        mockup_urls: order.mockup_urls || null, // Mockup tạm thời null, xử lý đồng bộ phía dưới
         special_print_areas: order.special_print_areas || null,
         order_note: order.order_note || null,
         status: "pending" as const, 
@@ -272,7 +263,6 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
       let totalCalculatedPrice = 0;
       let totalItemsCount = 0; 
       
-      // 1. KẾT NỐI DATABASE: Lấy cấu hình giá từ giao diện Admin
       const orderCountry = orderData.shipping_address?.country?.toUpperCase() 
                         || orderData.shipping_address?.country_code?.toUpperCase() 
                         || 'US';
@@ -283,14 +273,12 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
 
       if (shipConfigs.length === 0) {
         shipConfigs = await sellerService.listShippingPrices({
-          country_code: 'WW' // Nếu không tìm thấy US/CA, mặc định lấy cấu hình của WW (Toàn cầu)
+          country_code: 'WW' 
         }) as any[];
       }
 
-      // Nếu chưa cài đặt trên UI, mặc định lấy số 0
       const shipCfg = shipConfigs.length > 0 ? shipConfigs[0] : { first_item_cost: 0, additional_item_cost: 0 };
 
-      // 2. TÍNH TIỀN PHÔI VÀ ĐẾM TỔNG SỐ LƯỢNG SẢN PHẨM
       for (const item of orderData.items) {
         const safeType = item.type ? item.type.trim() : "";
         const safeSize = item.size ? item.size.trim() : "";
@@ -317,17 +305,11 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
         totalItemsCount += itemQty; 
       }
 
-      // 3. THUẬT TOÁN TÍNH CHIẾT KHẤU KỲ DIỆU
-      // Ép kiểu Number để đảm bảo an toàn toán học
       const firstItemCost = Number(shipCfg.first_item_cost) || 0;
       const additionalItemCost = Number(shipCfg.additional_item_cost) || 0;
-
-      // Nếu bạn nhập số âm trên UI, biến totalShippingCost sẽ tự động trở thành SỐ ÂM (Chiết khấu)
       const totalShippingCost = firstItemCost + (Math.max(0, totalItemsCount - 1) * additionalItemCost);
 
-      // Gán vào đơn hàng
       orderData.shipping_cost = totalShippingCost; 
-      // VẪN GIỮ NGUYÊN PHÍ PER ORDER Ở ĐÂY ĐỂ LƯU VÀO DATABASE CHO ADMIN THẤY
       const calculatedPrice = totalCalculatedPrice + totalShippingCost + perOrderFee;
       orderData.order_price = calculatedPrice > perOrderFee ? calculatedPrice : (orderData.order_price || 0);
     }
@@ -350,47 +332,41 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
 
     for (const orderData of formattedOrders) {
       
-      // =====================================================================
-      // 1. ĐỒNG BỘ NGƯỢC (MAPPING): ĐẨY DỮ LIỆU RA NGOÀI CHO ADMIN ĐỌC ĐƯỢC
-      // =====================================================================
+      // >>> SỬA LỖI 2: ĐỒNG BỘ NGƯỢC CHUẨN XÁC THEO MODEL <<<
       if (orderData.items && orderData.items.length > 0) {
         const firstItem = orderData.items[0];
 
-        // Đồng bộ Link Design
+        // SellerOrder Model CÓ định nghĩa 2 cột design độc lập
         orderData.design_front_url = firstItem.design_front || orderData.design_front_url;
         orderData.design_back_url = firstItem.design_back || orderData.design_back_url;
 
-        // Đồng bộ Mockup
-        if (firstItem.mockup) {
-          orderData.mockup_urls = typeof orderData.mockup_urls === 'object' && orderData.mockup_urls
-            ? { ...orderData.mockup_urls, default: firstItem.mockup }
-            : { default: firstItem.mockup };
-        }
-
-        // Đồng bộ Phôi, Màu, Size, SKU
+        // SellerOrder Model CÓ định nghĩa cột product_type
         orderData.product_type = orderData.items.length > 1 
           ? `${firstItem.type} (+${orderData.items.length - 1} món khác)` 
           : (firstItem.type || orderData.product_type);
-        orderData.sku = firstItem.sku || orderData.sku;
-        orderData.color = firstItem.color || orderData.color;
-        orderData.size = firstItem.size || orderData.size;
-        orderData.quantity = firstItem.quantity || orderData.quantity;
+          
+        // Gom các link Mockup vào mảng/object rỗng ban đầu, KHÔNG ÉP CỘT MOCKUP ĐỘC LẬP VÌ DB KHÔNG CÓ
+        let tempMockups: any = {};
+        orderData.items.forEach((it: any, i: number) => {
+            if(it.mockup) tempMockups[`Item_${i+1}`] = it.mockup;
+        });
+        if(Object.keys(tempMockups).length > 0) {
+             orderData.mockup_urls = tempMockups;
+        }
+        
+        // => TUYỆT ĐỐI KHÔNG ÉP `orderData.color`, `orderData.size`, `orderData.sku` VÌ DB SẼ CRASH.
+        // Admin sẽ tự động đọc color, size từ bên trong mảng `orderData.items` theo hàm renderProductColumn
       }
-
-      // =====================================================================
-      // 2. ÉP KIỂU MẢNG CHO CỘT JSONB (SỬA LỖI CRASH DATABASE)
-      // =====================================================================
-      // Tuyệt đối không dùng JSON.stringify. TypeORM sẽ tự động map Array vào cột jsonb.
-      orderData.product_detail = orderData.items;
 
       if (existingOrderMap.has(orderData.external_order_id)) {
         // --- NẾU ĐƠN HÀNG ĐÃ TỒN TẠI -> THỰC HIỆN UPDATE ---
         const internalOrderId = existingOrderMap.get(orderData.external_order_id);
         
-        // 3. FIX LỖI XUNG ĐỘT: Gỡ bỏ external_order_id và mảng ảo items ra khỏi Update Payload
+        // >>> SỬA LỖI 3: Lọc Payload tránh sập Update <<<
+        // Bỏ qua external_order_id, id, created_at, updated_at để Database không báo lỗi
         const { 
-          order_date, created_at, updated_at, status, items, 
-          external_order_id, id, // Bỏ qua các trường nhạy cảm để không bị DB chặn
+          order_date, created_at, updated_at, 
+          external_order_id, id, product_detail, // product_detail không có trong Model
           ...updatePayload 
         } = orderData; 
         
@@ -405,10 +381,14 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
           skippedOrderIds.push(orderData.external_order_id);
         }
       } else {
-        // Lọc bỏ id và mảng ảo items khi tạo mới
-        const { items, id, ...createPayload } = orderData;
-        await sellerService.createSellerOrders(createPayload);
-        createdCount++;
+        // --- TẠO MỚI ---
+        const { id, product_detail, ...createPayload } = orderData;
+        try {
+          await sellerService.createSellerOrders(createPayload);
+          createdCount++;
+        } catch (createErr) {
+          console.error("Lỗi tạo mới đơn hàng:", createErr);
+        }
       }
     }
 
