@@ -43,13 +43,16 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
 export async function POST(req: MedusaRequest, res: MedusaResponse) {
   try {
     const sellerService = req.scope.resolve("sellerModuleService") as any;
-    const { id, sku, design_front_url, design_back_url, mockup_url, shop_id } = req.body as {
+    
+    // >>> SỬA TẠI ĐÂY 1: Khai báo thêm trường extra_print_areas để hứng dữ liệu từ Frontend
+    const { id, sku, design_front_url, design_back_url, mockup_url, shop_id, extra_print_areas } = req.body as {
     id?: string;
     sku: string;
     design_front_url?: string;
     design_back_url?: string;
     mockup_url?: string;
     shop_id: string;
+    extra_print_areas?: any[];
   };
 
     if (!shop_id || !sku) {
@@ -65,6 +68,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
         design_front_url: design_front_url || null,
         design_back_url: design_back_url || null,
         mockup_url: mockup_url || null,
+        extra_print_areas: extra_print_areas || null, // >>> SỬA TẠI ĐÂY 2: Truyền dữ liệu vào lệnh Update
       });
     } else {
       // Nếu không truyền ID -> Kiểm tra trùng SKU trong Shop đó trước
@@ -77,6 +81,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
           design_front_url: design_front_url || existing[0].design_front_url,
           design_back_url: design_back_url || existing[0].design_back_url,
           mockup_url: mockup_url || existing[0].mockup_url,
+          extra_print_areas: extra_print_areas || existing[0].extra_print_areas, // >>> SỬA TẠI ĐÂY 3: Truyền dữ liệu vào lệnh Update (Nếu trùng)
         });
       } else {
         // Chưa có -> Tạo mới hoàn toàn
@@ -86,6 +91,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
           design_front_url: design_front_url || null,
           design_back_url: design_back_url || null,
           mockup_url: mockup_url || null,
+          extra_print_areas: extra_print_areas || null, // >>> SỬA TẠI ĐÂY 4: Truyền dữ liệu vào lệnh Create
         });
       }
     }
