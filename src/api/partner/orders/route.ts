@@ -78,9 +78,6 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
       { skip, take: limit, order: { created_at: "DESC" } }
     );
 
-    // =======================================================================
-    // LẤY THÔNG TIN SELLER ĐỂ LẤY PHÍ ẨN VÀ TRỪ RA TRƯỚC KHI GỬI CHO SELLER
-    // =======================================================================
     const sellers = await sellerService.listSellers({ id: currentSellerId });
     const perOrderFee = sellers.length > 0 ? Number(sellers[0].per_order_fee || 0) : 0;
 
@@ -163,12 +160,9 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
       markupFee = targetShop.seller.markup_fee || 0;
       perOrderFee = Number(targetShop.seller.per_order_fee || 0);
     }
-
-    // 3. SƠ CHẾ VÀ GÁN ĐÚNG SHOP_ID MÀ SELLER ĐÃ CHỌN
     const formattedOrders: any[] = rawOrders.map((order: any) => {
       let parsedAddress: any = {};
       try {
-        // Thuật toán Bóc Vỏ Hành: Chữa dứt điểm lỗi lặp 'raw' lồng nhau
         if (typeof order.shipping_address === 'string') {
           parsedAddress = order.shipping_address.includes('{') 
             ? JSON.parse(order.shipping_address) 
@@ -183,7 +177,6 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
 
       let parsedItems = [];
       try {
-        // Đồng bộ dữ liệu items từ product_detail (nếu có)
         if (order.items && Array.isArray(order.items)) {
            parsedItems = order.items;
         } else if (order.product_detail) {
@@ -202,8 +195,6 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
         shipping_address: parsedAddress,
         
         product_type: order.product_type || "Unknown Product",
-        
-        // >>> SỬA LỖI 1: Gán mảng trực tiếp vào items (Bảng SellerOrder định nghĩa items là json)
         items: parsedItems, 
         
         design_front_url: order.design_front_url || null,
@@ -331,21 +322,14 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     const skippedOrderIds: string[] = [];
 
     for (const orderData of formattedOrders) {
-      
-      // >>> SỬA LỖI 2: ĐỒNG BỘ NGƯỢC CHUẨN XÁC THEO MODEL <<<
       if (orderData.items && orderData.items.length > 0) {
         const firstItem = orderData.items[0];
-
-        // SellerOrder Model CÓ định nghĩa 2 cột design độc lập
         orderData.design_front_url = firstItem.design_front || orderData.design_front_url;
         orderData.design_back_url = firstItem.design_back || orderData.design_back_url;
-
-        // SellerOrder Model CÓ định nghĩa cột product_type
         orderData.product_type = orderData.items.length > 1 
           ? `${firstItem.type} (+${orderData.items.length - 1} món khác)` 
           : (firstItem.type || orderData.product_type);
-          
-        // Gom các link Mockup vào mảng/object rỗng ban đầu, KHÔNG ÉP CỘT MOCKUP ĐỘC LẬP VÌ DB KHÔNG CÓ
+
         let tempMockups: any = {};
         orderData.items.forEach((it: any, i: number) => {
             if(it.mockup) tempMockups[`Item_${i+1}`] = it.mockup;
@@ -353,23 +337,54 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
         if(Object.keys(tempMockups).length > 0) {
              orderData.mockup_urls = tempMockups;
         }
-        
-        // => TUYỆT ĐỐI KHÔNG ÉP `orderData.color`, `orderData.size`, `orderData.sku` VÌ DB SẼ CRASH.
-        // Admin sẽ tự động đọc color, size từ bên trong mảng `orderData.items` theo hàm renderProductColumn
       }
 
       if (existingOrderMap.has(orderData.external_order_id)) {
-        // --- NẾU ĐƠN HÀNG ĐÃ TỒN TẠI -> THỰC HIỆN UPDATE ---
-        const internalOrderId = existingOrderMap.get(orderData.external_order_id);
-        
-        // >>> SỬA LỖI 3: Lọc Payload tránh sập Update <<<
-        // Bỏ qua external_order_id, id, created_at, updated_at để Database không báo lỗi
+        const existingOrder = existingOrderMap.get(orderData.external_order_id);
+        if (existingOrder.status !== 'pending') {
+            skippedOrderIds.push(orderData.external_order_id);
+            continue; 
+        }
+
+        const internalOrderId = existingOrder.id;
+
         const { 
           order_date, created_at, updated_at, 
-          external_order_id, id, product_detail, mockup_urls,  // product_detail không có trong Model
+          external_order_id, id, product_detail, mockup_urls, status, 
           ...updatePayload 
         } = orderData; 
-        
+
+        let oldItems = existingOrder.items || [];
+        if (typeof oldItems === 'string') {
+            try { oldItems = JSON.parse(oldItems); } catch(e) { oldItems = []; }
+        }
+        if (oldItems.length > 0 && updatePayload.items && updatePayload.items.length > 0) {
+            updatePayload.items = updatePayload.items.map((newItem: any, idx: number) => {
+                const oldItem = oldItems[idx];
+                if (oldItem) {
+                    return {
+                        ...newItem,
+                        type: newItem.type || oldItem.type,
+                        color: newItem.color || oldItem.color,
+                        size: newItem.size || oldItem.size,
+                        sku: newItem.sku || oldItem.sku,
+                        design_front: newItem.design_front || oldItem.design_front,
+                        design_back: newItem.design_back || oldItem.design_back,
+                        mockup: newItem.mockup || oldItem.mockup,
+                        extra_print_areas: (newItem.extra_print_areas && newItem.extra_print_areas.length > 0) ? newItem.extra_print_areas : oldItem.extra_print_areas
+                    };
+                }
+                return newItem;
+            });
+            if (updatePayload.order_price === 0 && existingOrder.order_price > 0) {
+                updatePayload.order_price = existingOrder.order_price;
+                updatePayload.shipping_cost = existingOrder.shipping_cost;
+            }
+            updatePayload.product_type = updatePayload.items.length > 1 
+                ? `${updatePayload.items[0].type} (+${updatePayload.items.length - 1} món khác)` 
+                : (updatePayload.items[0].type || existingOrder.product_type);
+        }
+
         try {
           await sellerService.updateSellerOrders({
             id: internalOrderId,
@@ -379,15 +394,6 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
         } catch (updateErr) {
           console.error("Lỗi cập nhật đơn hàng:", updateErr);
           skippedOrderIds.push(orderData.external_order_id);
-        }
-      } else {
-        // --- TẠO MỚI ---
-        const { id, product_detail, mockup_urls, ...createPayload } = orderData;
-        try {
-          await sellerService.createSellerOrders(createPayload);
-          createdCount++;
-        } catch (createErr) {
-          console.error("Lỗi tạo mới đơn hàng:", createErr);
         }
       }
     }
