@@ -314,7 +314,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     
     const existingOrderMap = new Map();
     existingOrders.forEach((o: any) => {
-      existingOrderMap.set(o.external_order_id, o.id);
+      existingOrderMap.set(o.external_order_id, o);
     });
     
     let createdCount = 0;
@@ -340,28 +340,24 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
       }
 
       if (existingOrderMap.has(orderData.external_order_id)) {
+        // --- NẾU ĐƠN HÀNG ĐÃ TỒN TẠI -> THỰC HIỆN UPDATE ---
         const existingOrder = existingOrderMap.get(orderData.external_order_id);
+
         if (existingOrder.status !== 'pending') {
             skippedOrderIds.push(orderData.external_order_id);
-            continue; 
+            continue;
         }
-
-        const internalOrderId = existingOrder.id;
-
-        const { 
-          order_date, created_at, updated_at, 
-          external_order_id, id, product_detail, mockup_urls, status, 
-          ...updatePayload 
-        } = orderData; 
 
         let oldItems = existingOrder.items || [];
         if (typeof oldItems === 'string') {
             try { oldItems = JSON.parse(oldItems); } catch(e) { oldItems = []; }
         }
-        if (oldItems.length > 0 && updatePayload.items && updatePayload.items.length > 0) {
-            updatePayload.items = updatePayload.items.map((newItem: any, idx: number) => {
+
+        if (oldItems.length > 0 && orderData.items && orderData.items.length > 0) {
+            orderData.items = orderData.items.map((newItem: any, idx: number) => {
                 const oldItem = oldItems[idx];
                 if (oldItem) {
+                    // Nếu CSV thô không có dữ liệu, lấy lại dữ liệu từ DB cũ
                     return {
                         ...newItem,
                         type: newItem.type || oldItem.type,
@@ -371,19 +367,32 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
                         design_front: newItem.design_front || oldItem.design_front,
                         design_back: newItem.design_back || oldItem.design_back,
                         mockup: newItem.mockup || oldItem.mockup,
-                        extra_print_areas: (newItem.extra_print_areas && newItem.extra_print_areas.length > 0) ? newItem.extra_print_areas : oldItem.extra_print_areas
+                        extra_print_areas: (newItem.extra_print_areas && newItem.extra_print_areas.length > 0) ? newItem.extra_print_areas : oldItem.extra_print_areas,
+                        unit_price: oldItem.unit_price || newItem.unit_price
                     };
                 }
                 return newItem;
             });
-            if (updatePayload.order_price === 0 && existingOrder.order_price > 0) {
-                updatePayload.order_price = existingOrder.order_price;
-                updatePayload.shipping_cost = existingOrder.shipping_cost;
+
+            if (orderData.order_price === 0 && existingOrder.order_price > 0) {
+                orderData.order_price = existingOrder.order_price;
+                orderData.shipping_cost = existingOrder.shipping_cost;
             }
-            updatePayload.product_type = updatePayload.items.length > 1 
-                ? `${updatePayload.items[0].type} (+${updatePayload.items.length - 1} món khác)` 
-                : (updatePayload.items[0].type || existingOrder.product_type);
+
+            // KHÔI PHỤC TÊN SẢN PHẨM HIỂN THỊ
+            orderData.product_type = orderData.items.length > 1 
+                ? `${orderData.items[0].type} (+${orderData.items.length - 1} món khác)` 
+                : (orderData.items[0].type || existingOrder.product_type);
         }
+
+        const internalOrderId = existingOrder.id;
+
+        const { 
+          order_date, created_at, updated_at, 
+          external_order_id, id, product_detail, mockup_urls, status, 
+          color, size, sku, // Lọc bỏ triệt để các trường có thể gây lỗi
+          ...updatePayload 
+        } = orderData; 
 
         try {
           await sellerService.updateSellerOrders({
