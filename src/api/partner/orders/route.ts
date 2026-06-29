@@ -382,7 +382,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
         }
       } else {
         // --- TẠO MỚI ---
-        const { id, product_detail, mockup_urls ...createPayload } = orderData;
+        const { id, product_detail, mockup_urls, ...createPayload } = orderData;
         try {
           await sellerService.createSellerOrders(createPayload);
           createdCount++;
