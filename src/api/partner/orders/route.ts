@@ -366,7 +366,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
         // Bỏ qua external_order_id, id, created_at, updated_at để Database không báo lỗi
         const { 
           order_date, created_at, updated_at, 
-          external_order_id, id, product_detail, // product_detail không có trong Model
+          external_order_id, id, product_detail, mockup_urls,  // product_detail không có trong Model
           ...updatePayload 
         } = orderData; 
         
@@ -382,7 +382,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
         }
       } else {
         // --- TẠO MỚI ---
-        const { id, product_detail, ...createPayload } = orderData;
+        const { id, product_detail, mockup_urls ...createPayload } = orderData;
         try {
           await sellerService.createSellerOrders(createPayload);
           createdCount++;
