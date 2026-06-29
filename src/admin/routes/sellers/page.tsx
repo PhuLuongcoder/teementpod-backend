@@ -1109,6 +1109,8 @@ export default function SellersAdminPage() {
                   </th>
                   <th className="px-4 py-3 font-semibold">Mã Đơn / Trạng thái</th>
                   <th className="px-4 py-3 font-semibold">Shop & Khách</th>
+                  <th className="px-4 py-3 font-semibold text-center">Ngày Lên Đơn</th>
+                  <th className="px-4 py-3 font-semibold text-center">Ngày Thanh Toán</th>
                   <th className="px-4 py-3 font-semibold">Sản phẩm</th>
                   <th className="px-4 py-3 font-semibold text-center">Thiết kế</th>
                   <th className="px-4 py-3 font-semibold">Nhà In</th>
@@ -1148,6 +1150,34 @@ export default function SellersAdminPage() {
                       <td className="px-4 py-3 text-xs text-gray-600">
                         <div className="font-medium text-gray-900">Shop: {order.shop?.name || order.shop_id}</div>
                         <div>Khách: {order.customer_name}</div>
+                      </td>
+                      {/* CỘT 1: NGÀY LÊN ĐƠN (Lấy từ file CSV import - order_date) */}
+                      <td className="px-4 py-3 text-center align-top">
+                        <div className="flex flex-col gap-1 mt-1">
+                          <span className="text-xs font-semibold text-gray-700">
+                            {order.order_date ? new Date(order.order_date).toLocaleDateString('vi-VN') : '---'}
+                          </span>
+                        </div>
+                      </td>
+                      
+                      {/* CỘT 2: NGÀY THANH TOÁN (Lấy mốc thời gian khi đơn hết pending) */}
+                      <td className="px-4 py-3 text-center align-top">
+                        {order.status !== 'pending' ? (
+                          <div className="flex flex-col gap-1 mt-1">
+                            <span className="text-xs font-bold text-green-700 bg-green-50 px-2 py-0.5 rounded border border-green-200 inline-block w-max mx-auto shadow-sm">
+                              {order.paid_at 
+                                ? new Date(order.paid_at).toLocaleDateString('vi-VN') 
+                                : order.updated_at ? new Date(order.updated_at).toLocaleDateString('vi-VN') : '---'}
+                            </span>
+                            <span className="text-[10px] text-gray-400">
+                              {order.paid_at 
+                                ? new Date(order.paid_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) 
+                                : order.updated_at ? new Date(order.updated_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : ''}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="mt-2 text-[11px] text-gray-400 italic font-medium">Chưa thanh toán</div>
+                        )}
                       </td>
                       <td className="px-4 py-3">{renderProductColumn(order)}</td>
                       {/* CỘT HIỂN THỊ DESIGN (INLINE) */}
