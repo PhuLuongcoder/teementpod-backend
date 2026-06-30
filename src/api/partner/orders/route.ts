@@ -404,7 +404,26 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
           console.error("Lỗi cập nhật đơn hàng:", updateErr);
           skippedOrderIds.push(orderData.external_order_id);
         }
-      }
+      } else {
+
+        const { 
+          items, 
+          color, size, sku, id, created_at, updated_at,
+          ...createPayload 
+        } = orderData;
+
+        if (items && Array.isArray(items)) {
+          createPayload.product_detail = JSON.stringify(items);
+        }
+
+        try {
+          await sellerService.createSellerOrders(createPayload);
+          
+          createdCount++;
+        } catch (createErr) {
+          console.error(`Lỗi tạo mới đơn hàng ${orderData.external_order_id}:`, createErr);
+          skippedOrderIds.push(orderData.external_order_id);
+        }
     }
 
     let responseMessage = `Đã đồng bộ thành công! (Tạo mới: ${createdCount} đơn, Cập nhật: ${updatedCount} đơn).`;
