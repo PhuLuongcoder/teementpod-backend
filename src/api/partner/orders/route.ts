@@ -424,6 +424,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
           console.error(`Lỗi tạo mới đơn hàng ${orderData.external_order_id}:`, createErr);
           skippedOrderIds.push(orderData.external_order_id);
         }
+      }
     }
 
     let responseMessage = `Đã đồng bộ thành công! (Tạo mới: ${createdCount} đơn, Cập nhật: ${updatedCount} đơn).`;
