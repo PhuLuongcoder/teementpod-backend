@@ -198,23 +198,48 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
     // ==========================================
     // 6. TÍNH TOÁN CÔNG NỢ & LỊCH SỬ THANH TOÁN
     // ==========================================
-    const paymentHistory = await sellerService.listPaymentHistories(
-      filters.shop_id ? { shop_id: filters.shop_id } : {}, 
-      { order: { created_at: "DESC" } } 
-    ) || [];
+    let paymentHistory: any[] = [];
+    let allTimeOrders: any[] = [];
 
+    if (Array.isArray(filters.shop_id)) {
+      // 🛠 TRẢI PHẲNG TRUY VẤN: Tách mảng ra để gọi từng Shop, tránh lỗi TypeORM từ chối Array
+      const paymentPromises = filters.shop_id.map((id: string) => 
+        sellerService.listPaymentHistories({ shop_id: id }, { order: { created_at: "DESC" } })
+      );
+      const orderPromises = filters.shop_id.map((id: string) => 
+        sellerService.listSellerOrders({ shop_id: id })
+      );
+      
+      const paymentResults = await Promise.all(paymentPromises);
+      const orderResults = await Promise.all(orderPromises);
+      
+      // Gộp kết quả và sắp xếp lại theo thời gian
+      paymentHistory = paymentResults.flat().sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      allTimeOrders = orderResults.flat();
+      
+    } else if (filters.shop_id) {
+      // Truy vấn bình thường nếu chỉ đang xem 1 Shop cụ thể
+      paymentHistory = await sellerService.listPaymentHistories({ shop_id: filters.shop_id }, { order: { created_at: "DESC" } }) || [];
+      allTimeOrders = await sellerService.listSellerOrders({ shop_id: filters.shop_id }) || [];
+    } else {
+      // Fallback dự phòng
+      paymentHistory = await sellerService.listPaymentHistories({}, { order: { created_at: "DESC" } }) || [];
+      allTimeOrders = await sellerService.listSellerOrders({}) || [];
+    }
+
+    // Tính tổng tiền đã gạch nợ thực tế
     const total_paid = paymentHistory.reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
 
-    const allTimeOrders = await sellerService.listSellerOrders(filters.shop_id ? { shop_id: filters.shop_id } : {});
+    // Tính tổng công nợ phát sinh từ các đơn
     let total_debt_generated = 0;
     allTimeOrders.forEach((o: any) => {
       if (paidStatuses.includes(o.status)) {
-        // Cộng thẳng order_price (đã có phí) vào công nợ
         total_debt_generated += Number(o.order_price || 0);
       }
     });
 
-    const current_debt = total_debt_generated - total_paid;
+    // 🛠 Chặn hiển thị số âm (Math.max) phòng trường hợp Admin gạch lố tiền hoặc làm tròn sai
+    const current_debt = Math.max(0, total_debt_generated - total_paid);
     
     // ==========================================
     // 7. TRẢ KẾT QUẢ VỀ FRONTEND
