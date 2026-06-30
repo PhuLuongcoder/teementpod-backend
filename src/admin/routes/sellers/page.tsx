@@ -516,23 +516,59 @@ export default function SellersAdminPage() {
     }
   };
 
-  const renderProductColumn = (order: any) => {
-      const itemsArray = order.items || [];
-      if (itemsArray.length > 0) {
-        return (
-          <div className="flex flex-col gap-1.5 py-1">
-            {itemsArray.map((item: any, idx: number) => (
-              <div key={idx} className="text-[10px] bg-gray-50 px-2 py-1 rounded border border-gray-200 flex items-center gap-1.5 w-max">
-                <span className="font-bold text-blue-600 bg-blue-100 px-1 rounded">{item.quantity || 1}x</span>
-                <span className="font-semibold text-gray-700">{item.type}</span>
-                <span className="text-gray-400 italic">({item.color || 'N/A'} - {item.size || 'N/A'})</span>
-              </div>
-            ))}
-          </div>
-        );
+  const renderOriginalProductColumn = (order: any) => {
+    let itemsArray: any[] = [];
+    try {
+      if (Array.isArray(order.items) && order.items.length > 0) itemsArray = order.items;
+      else if (order.product_detail) {
+        const pd = typeof order.product_detail === 'string' ? JSON.parse(order.product_detail) : order.product_detail;
+        itemsArray = Array.isArray(pd) ? pd : (pd?.items || [pd]);
       }
-      return <span className="text-sm">{order.product_type || '---'}</span>;
-    };
+    } catch (e) { }
+
+    if (itemsArray.length > 0) {
+      return (
+        <div className="flex flex-col gap-1.5 py-1">
+          {itemsArray.map((item: any, idx: number) => {
+            const originalName = item.original_string || 'N/A (Lên đơn thủ công)';
+            return (
+              <div key={idx} className="text-[10px] bg-amber-50 text-amber-800 px-2 py-1 rounded border border-amber-200 truncate font-medium max-w-[200px]" title={originalName}>
+                {originalName}
+              </div>
+            );
+          })}
+        </div>
+      );
+    }
+    return <span className="text-[10px] text-gray-400 italic">---</span>;
+  };
+
+  // 2. CỘT PHÔI FULFILL (Seller đã chọn) - Đã nâng cấp parse JSON an toàn
+  const renderProductColumn = (order: any) => {
+    let itemsArray: any[] = [];
+    try {
+      if (Array.isArray(order.items) && order.items.length > 0) itemsArray = order.items;
+      else if (order.product_detail) {
+        const pd = typeof order.product_detail === 'string' ? JSON.parse(order.product_detail) : order.product_detail;
+        itemsArray = Array.isArray(pd) ? pd : (pd?.items || [pd]);
+      }
+    } catch (e) { }
+
+    if (itemsArray.length > 0) {
+      return (
+        <div className="flex flex-col gap-1.5 py-1">
+          {itemsArray.map((item: any, idx: number) => (
+            <div key={idx} className="text-[10px] bg-blue-50/50 px-2 py-1 rounded border border-blue-100 flex items-center gap-1.5 w-max">
+              <span className="font-bold text-blue-600 bg-blue-100 px-1 rounded">{item.quantity || 1}x</span>
+              <span className="font-semibold text-gray-700">{item.type || order.product_type}</span>
+              <span className="text-gray-400 italic">({item.color || 'N/A'} - {item.size || 'N/A'})</span>
+            </div>
+          ))}
+        </div>
+      );
+    }
+    return <span className="text-[10px] font-semibold text-blue-700 bg-blue-50 px-2 py-1 rounded border border-blue-100">{order.product_type || '---'}</span>;
+  };
 
   const downloadCSV = (data: any[]) => {
     if (data.length === 0) return;
@@ -1111,7 +1147,8 @@ export default function SellersAdminPage() {
                   <th className="px-4 py-3 font-semibold">Shop & Khách</th>
                   <th className="px-4 py-3 font-semibold text-center">Ngày Lên Đơn</th>
                   <th className="px-4 py-3 font-semibold text-center">Ngày Thanh Toán</th>
-                  <th className="px-4 py-3 font-semibold">Sản phẩm</th>
+                  <th className="px-4 py-3 font-semibold text-amber-700">Sản phẩm Gốc</th>
+                  <th className="px-4 py-3 font-semibold text-blue-700">Phôi Fulfill</th>
                   <th className="px-4 py-3 font-semibold text-center">Thiết kế</th>
                   <th className="px-4 py-3 font-semibold">Nhà In</th>
                   <th className="px-4 py-3 font-semibold">Tracking</th>
@@ -1179,7 +1216,8 @@ export default function SellersAdminPage() {
                           <div className="mt-2 text-[11px] text-gray-400 italic font-medium">Chưa thanh toán</div>
                         )}
                       </td>
-                      <td className="px-4 py-3">{renderProductColumn(order)}</td>
+                      <td className="px-4 py-3 align-top">{renderOriginalProductColumn(order)}</td>
+                      <td className="px-4 py-3 align-top">{renderProductColumn(order)}</td>
                       {/* CỘT HIỂN THỊ DESIGN (INLINE) */}
                       <td className="px-4 py-3 text-center">
                         <div className="flex flex-wrap gap-2 justify-center min-w-[80px]">
