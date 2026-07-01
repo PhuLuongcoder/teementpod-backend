@@ -387,10 +387,12 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
 
         const internalOrderId = existingOrder.id;
 
+        // --- NẾU ĐƠN HÀNG ĐÃ TỒN TẠI -> UPDATE ---
+        // (Không có biến 'items' ở đây -> Mảng items sẽ được giữ lại trong updatePayload)
         const { 
           order_date, created_at, updated_at, 
           external_order_id, id, product_detail, mockup_urls, status, 
-          color, size, sku, // Lọc bỏ triệt để các trường có thể gây lỗi
+          color, size, sku, 
           ...updatePayload 
         } = orderData; 
 
@@ -404,19 +406,16 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
           console.error("Lỗi cập nhật đơn hàng:", updateErr);
           skippedOrderIds.push(orderData.external_order_id);
         }
+
       } else {
 
         const { 
-          items, 
-          color, size, sku, id, created_at, updated_at,
+          color, size, sku, id, created_at, updated_at, product_detail, mockup_urls,
           ...createPayload 
         } = orderData;
 
-        if (items && Array.isArray(items)) {
-          createPayload.product_detail = JSON.stringify(items);
-        }
-
         try {
+          // Gửi trực tiếp payload (đã chứa sẵn mảng items nguyên bản) xuống DB
           await sellerService.createSellerOrders(createPayload);
           
           createdCount++;
